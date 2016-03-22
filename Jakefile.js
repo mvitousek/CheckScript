@@ -274,7 +274,7 @@ function compileFile(outFile, sources, prereqs, prefixes, useBuiltCompiler, opts
         if (useDebugMode) {
             options += " -sourcemap";
             if (!opts.noMapRoot) {
-                options += " -mapRoot file:///" + path.resolve(path.dirname(outFile));
+                options += " -mapRoot \"file:///" + path.resolve(path.dirname(outFile)) + "\"";
             }
         }
 
