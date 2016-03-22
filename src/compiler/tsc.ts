@@ -246,6 +246,7 @@ namespace ts {
     }
 
     export function executeCommandLine(args: string[]): void {
+        sys.write("hello world!")
         const commandLine = parseCommandLine(args);
         let configFileName: string;                                 // Configuration file name (if any)
         let cachedConfigFileText: string;                           // Cached configuration file text, used for reparsing (if any)
