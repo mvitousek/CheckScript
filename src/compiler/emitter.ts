@@ -1,5 +1,6 @@
 /// <reference path="checker.ts"/>
 /// <reference path="sourcemap.ts" />
+/// <reference path="types.ts" />
 /// <reference path="declarationEmitter.ts"/>
 
 /* @internal */
@@ -4792,6 +4793,57 @@ const _super = (function (geti, seti) {
                 }
             }
 
+            // [CheckScript]
+            function emitArgumentProtectors(node: FunctionLikeDeclaration) {
+                forEach(node.parameters, param => {
+                    if (param.type) {
+                        writeLine();
+                        emitStart(param);
+                        emitTransientCheck(param.name, param.type)
+                        // emitCTSRT("cast");
+                        // write("(");
+                        // emitCTSTypeNode(<TypeNode>param.type);
+                        // write(",");
+                        // emitNode(param.name);
+                        // write(");");
+                        emitEnd(param);
+                    }
+                });
+            }
+
+            function emitTransientCheck(name: Identifier | BindingPattern, type: TypeNode) {
+                emitCheckCall();
+                write("(");
+                emit(name);
+                write(",");
+                emitTransientTypeTag(type);
+                write(");");
+            }
+
+            function emitCheckCall() {
+                write("//checkscript.check");
+            }
+
+            function emitTransientTypeTag(type: TypeNode) {
+                switch (type.kind) {
+                case SyntaxKind.AnyKeyword:
+                case SyntaxKind.VoidKeyword:
+                    return write("Object");
+                case SyntaxKind.StringKeyword:
+                case SyntaxKind.StringLiteral:
+                    return write("String");
+                case SyntaxKind.NumberKeyword:
+                    return write("Number");
+                case SyntaxKind.BooleanKeyword:
+                    return write("Boolean");
+                case SyntaxKind.TypeReference:
+                    //Debug.fail("Unsupported CheckScript type: " + type.kind);
+                default:
+                    //Debug.fail("Unsupported CheckScript type: " + type.kind);
+                }
+            }
+            // [/CheckScript] 
+
             function emitSignatureAndBody(node: FunctionLikeDeclaration) {
                 const saveConvertedLoopState = convertedLoopState;
                 const saveTempFlags = tempFlags;
@@ -4811,6 +4863,10 @@ const _super = (function (geti, seti) {
                 else {
                     emitSignatureParameters(node);
                 }
+
+                // [CheckScript]
+                emitArgumentProtectors(node);
+                // [/CheckScript]
 
                 const isAsync = isAsyncFunctionLike(node);
                 if (isAsync) {
@@ -4903,6 +4959,7 @@ const _super = (function (geti, seti) {
             }
 
             function emitBlockFunctionBody(node: FunctionLikeDeclaration, body: Block) {
+                sys.write("emitting a function body\n")
                 write(" {");
                 const initialTextPos = writer.getTextPos();
 
@@ -4918,6 +4975,7 @@ const _super = (function (geti, seti) {
                 const preambleEmitted = writer.getTextPos() !== initialTextPos;
 
                 if (!preambleEmitted && nodeEndIsOnSameLineAsNodeStart(body, body)) {
+                    write("//yup");
                     for (const statement of body.statements) {
                         write(" ");
                         emit(statement);
@@ -4928,6 +4986,12 @@ const _super = (function (geti, seti) {
                 }
                 else {
                     increaseIndent();
+                    // [CheckScript TESTING]
+                    for (const param of node.parameters) {
+                        write("//yu2p");// + emitType(node.type));
+                    }
+                    // [/CheckScript TESTING]
+                    if (node.parameters[0] && node.parameters[0].type) { write("//" + (node.parameters[0].type))}
                     emitLinesStartingAt(body.statements, startIndex);
                     emitTempDeclarations(/*newLine*/ true);
 
@@ -4938,6 +5002,8 @@ const _super = (function (geti, seti) {
 
                 emitToken(SyntaxKind.CloseBraceToken, body.statements.end);
             }
+                
+
 
             /**
              * Return the statement at a given index if it is a super-call statement

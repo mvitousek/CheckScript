@@ -1899,6 +1899,7 @@ namespace ts {
 
     /* @internal */
     export interface EmitResolver {
+        getTypeFromTypeNode(node: TypeNode): Type;
         hasGlobalName(name: string): boolean;
         getReferencedExportContainer(node: Identifier): SourceFile | ModuleDeclaration | EnumDeclaration;
         getReferencedImportDeclaration(node: Identifier): Declaration;

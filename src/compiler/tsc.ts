@@ -246,7 +246,7 @@ namespace ts {
     }
 
     export function executeCommandLine(args: string[]): void {
-        sys.write("hello world!")
+        sys.write("hello world!" + args)
         const commandLine = parseCommandLine(args);
         let configFileName: string;                                 // Configuration file name (if any)
         let cachedConfigFileText: string;                           // Cached configuration file text, used for reparsing (if any)
@@ -546,8 +546,11 @@ namespace ts {
         checkTime = 0;
         emitTime = 0;
 
+        sys.write("precreate\n")
         const program = createProgram(fileNames, compilerOptions, compilerHost);
+        sys.write("midcreate\n")
         const exitStatus = compileProgram();
+        sys.write("postcreate\n")
 
         if (compilerOptions.listFiles) {
             forEach(program.getSourceFiles(), file => {
@@ -600,7 +603,9 @@ namespace ts {
             }
 
             // Otherwise, emit and report any errors we ran into.
+            sys.write("prep emit\n");
             const emitOutput = program.emit();
+            sys.write("post emit\n");
             diagnostics = diagnostics.concat(emitOutput.diagnostics);
 
             reportDiagnostics(sortAndDeduplicateDiagnostics(diagnostics), compilerHost);
