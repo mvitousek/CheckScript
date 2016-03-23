@@ -2433,6 +2433,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 write(isSuperBinding ? ").value" : ")");
             }
 
+            //[CheckScript]
+            function emitCallExpressionWithCheck(node: CallExpression) {
+                //emitTransientCheck(node, node.type);
+            }
+            //[/CheckScript]
+
             function emitCallExpression(node: CallExpression) {
                 if (languageVersion < ScriptTarget.ES6 && hasSpreadElement(node.arguments)) {
                     emitCallWithSpread(node);
@@ -2466,6 +2472,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitCommaList(node.arguments);
                     write(")");
                 }
+                //[CheckScript TESTING]
+                if (node.checkedType) {
+                    write(" //");
+                    emitTransientTypeTagFromType(node.checkedType);
+                }
+                //[/CheckScript TESTING]
             }
 
             function emitNewExpression(node: NewExpression) {
@@ -4816,7 +4828,7 @@ const _super = (function (geti, seti) {
                 write("(");
                 emit(name);
                 write(",");
-                emitTransientTypeTag(type);
+                emitTransientTypeTagFromTypeNode(type);
                 write(");");
             }
 
@@ -4824,7 +4836,36 @@ const _super = (function (geti, seti) {
                 write("//checkscript.check");
             }
 
-            function emitTransientTypeTag(type: TypeNode) {
+            function emitTransientTypeTagFromType(type: Type) {
+                if (type.flags & TypeFlags.String ||
+                    type.flags & TypeFlags.StringLiteral) {
+                    write("String");
+                } else if (type.flags & TypeFlags.Number) {
+                    write("Number");
+                } else if (type.flags & TypeFlags.Boolean) {
+                    write("Boolean");
+                } else if (type.symbol) {
+                    // FIXME
+                    write(type.symbol.name);
+                } else {
+                    write("Any");
+                    console.log(type);
+                    //throw new Error("Cannot create dynamic type check!");
+                }
+            }
+
+            function emitTransientTypeTagFromTypeNode(type: TypeNode) {
+                function emitEntityName(entityName: EntityName) {
+                    if (entityName.kind === SyntaxKind.Identifier) {
+                        writeTextOfNode(currentText, entityName);
+                    } else {
+                        var qualifiedName = <QualifiedName>entityName;
+                        emitEntityName(qualifiedName.left);
+                        write(".");
+                        writeTextOfNode(currentText, qualifiedName.right);
+                    }
+                }
+
                 switch (type.kind) {
                 case SyntaxKind.AnyKeyword:
                 case SyntaxKind.VoidKeyword:
@@ -4837,7 +4878,7 @@ const _super = (function (geti, seti) {
                 case SyntaxKind.BooleanKeyword:
                     return write("Boolean");
                 case SyntaxKind.TypeReference:
-                    //Debug.fail("Unsupported CheckScript type: " + type.kind);
+                    return emitEntityName((<TypeReferenceNode>type).typeName);
                 default:
                     //Debug.fail("Unsupported CheckScript type: " + type.kind);
                 }
@@ -4863,10 +4904,6 @@ const _super = (function (geti, seti) {
                 else {
                     emitSignatureParameters(node);
                 }
-
-                // [CheckScript]
-                emitArgumentProtectors(node);
-                // [/CheckScript]
 
                 const isAsync = isAsyncFunctionLike(node);
                 if (isAsync) {
@@ -4959,12 +4996,13 @@ const _super = (function (geti, seti) {
             }
 
             function emitBlockFunctionBody(node: FunctionLikeDeclaration, body: Block) {
-                sys.write("emitting a function body\n")
                 write(" {");
                 const initialTextPos = writer.getTextPos();
 
                 increaseIndent();
                 emitDetachedCommentsAndUpdateCommentsInfo(body.statements);
+
+
 
                 // Emit all the directive prologues (like "use strict").  These have to come before
                 // any other preamble code we write (like parameter initializers).
@@ -4975,7 +5013,6 @@ const _super = (function (geti, seti) {
                 const preambleEmitted = writer.getTextPos() !== initialTextPos;
 
                 if (!preambleEmitted && nodeEndIsOnSameLineAsNodeStart(body, body)) {
-                    write("//yup");
                     for (const statement of body.statements) {
                         write(" ");
                         emit(statement);
@@ -4986,12 +5023,9 @@ const _super = (function (geti, seti) {
                 }
                 else {
                     increaseIndent();
-                    // [CheckScript TESTING]
-                    for (const param of node.parameters) {
-                        write("//yu2p");// + emitType(node.type));
-                    }
-                    // [/CheckScript TESTING]
-                    if (node.parameters[0] && node.parameters[0].type) { write("//" + (node.parameters[0].type))}
+                    // [CheckScript]
+                    emitArgumentProtectors(node);
+                    // [/CheckScript]
                     emitLinesStartingAt(body.statements, startIndex);
                     emitTempDeclarations(/*newLine*/ true);
 

@@ -11004,7 +11004,11 @@ namespace ts {
                 return resolveExternalModuleTypeByLiteral(<StringLiteral>node.arguments[0]);
             }
 
-            return getReturnTypeOfSignature(signature);
+            //[CheckScript]
+            const retty = getReturnTypeOfSignature(signature);
+            node.checkedType = retty
+            return retty
+            //[/CheckScript]
         }
 
         function checkTaggedTemplateExpression(node: TaggedTemplateExpression): Type {
