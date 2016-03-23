@@ -4849,7 +4849,7 @@ const _super = (function (geti, seti) {
                     write(type.symbol.name);
                 } else {
                     write("Any");
-                    console.log(type);
+                    //console.log(type);
                     //throw new Error("Cannot create dynamic type check!");
                 }
             }
@@ -6215,9 +6215,19 @@ const _super = (function (geti, seti) {
                 return argumentsWritten;
             }
 
+            //[CheckScript]
             function emitInterfaceDeclaration(node: InterfaceDeclaration) {
-                emitCommentsOnNotEmittedNode(node);
+                write("interface ");
+                writeTextOfNode(currentText, node.name);
+                write(" {");
+                writeLine();
+                increaseIndent();
+                emitLines(node.members);
+                decreaseIndent();
+                write("}");
+                writeLine();
             }
+            //[/CheckScript]
 
             function shouldEmitEnumDeclaration(node: EnumDeclaration) {
                 const isConstEnum = isConst(node);

@@ -10141,7 +10141,6 @@ namespace ts {
                     const errorNode = reportErrors ? getEffectiveArgumentErrorNode(node, i, arg) : undefined;
                     const headMessage = Diagnostics.Argument_of_type_0_is_not_assignable_to_parameter_of_type_1;
                     if (!checkTypeRelatedTo(argType, paramType, relation, errorNode, headMessage)) {
-                        sys.write("ERR" + argType.toString() + paramType.toString())
                         return false;
                     }
                 }
@@ -13578,10 +13577,6 @@ namespace ts {
                 }
             }
 
-            if (node.type && <Identifier>node.name) {
-                sys.write(getTypeFromTypeNode(node.type) + "<-" + (<Identifier>node.name).text + "\n")
-            }
-
             checkSourceElement(node.body);
             if (!node.asteriskToken) {
                 const returnOrPromisedType = node.type && (isAsync ? checkAsyncFunctionReturnType(node) : getTypeFromTypeNode(node.type));
@@ -15009,7 +15004,6 @@ namespace ts {
                 }
                 checkTypeReferenceNode(heritageElement);
             });
-
             forEach(node.members, checkSourceElement);
 
             if (produceDiagnostics) {
@@ -15872,6 +15866,7 @@ namespace ts {
                 case SyntaxKind.MissingDeclaration:
                     return checkMissingDeclaration(node);
             }
+            
         }
 
         // Function and class expression bodies are checked after all statements in the enclosing body. This is
