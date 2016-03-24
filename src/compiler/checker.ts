@@ -9604,8 +9604,16 @@ namespace ts {
             }
 
             const propType = getTypeOfSymbol(prop);
-            return node.kind === SyntaxKind.PropertyAccessExpression && prop.flags & SymbolFlags.Property ?
+            //[CheckScript]
+            const retty = node.kind === SyntaxKind.PropertyAccessExpression && prop.flags & SymbolFlags.Property ?
                 getNarrowedTypeOfReference(propType, <PropertyAccessExpression>node) : propType;
+            if (isFunctionType(retty)) {
+                node.checkedType = anyFunctionType;
+            } else {
+                node.checkedType = retty
+            }
+            return retty;
+            //[/CheckScript]
         }
 
         function isValidPropertyAccess(node: PropertyAccessExpression | QualifiedName, propertyName: string): boolean {

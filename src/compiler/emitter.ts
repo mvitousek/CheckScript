@@ -2229,7 +2229,23 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 }
             }
 
+            //[CheckScript]
             function emitPropertyAccess(node: PropertyAccessExpression) {
+                if (node.checkedType && checkNeededForType(node.checkedType)) {
+                    emitCheckCall();
+                    write("(");
+                    emitPropertyAccessWithoutCheck(node);
+                    write(", ");
+                    emitTransientTypeTagFromType(node.checkedType);
+                    write(")");
+                } else {
+                    emitPropertyAccessWithoutCheck(node);
+                }
+            }
+            //[/CheckScript]
+
+
+            function emitPropertyAccessWithoutCheck(node: PropertyAccessExpression) { //[CheckScript renamed from emitPropertyAccess /]
                 if (tryEmitConstantValue(node)) {
                     return;
                 }
@@ -2434,13 +2450,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
 
             //[CheckScript]
-                
             function emitCallExpression(node: CallExpression) {
                 if (node.checkedType && checkNeededForType(node.checkedType)) {
                     emitCheckCall();
                     write("(");
                     emitCallExpressionWithoutCheck(node);
-                    write(",");
+                    write(", ");
                     emitTransientTypeTagFromType(node.checkedType);
                     write(")");
                 } else {
@@ -2454,8 +2469,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 //}
                 //[/CheckScript TESTING]
             }
+            //[/CheckScript]
 
-            function emitCallExpressionWithoutCheck(node: CallExpression) {
+            function emitCallExpressionWithoutCheck(node: CallExpression) { //[CheckScript renamed from emitCallExpression /]
                 if (languageVersion < ScriptTarget.ES6 && hasSpreadElement(node.arguments)) {
                     emitCallWithSpread(node);
                     return;
@@ -2489,7 +2505,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     write(")");
                 }
             }
-            //[/CheckScript]
 
             function emitNewExpression(node: NewExpression) {
                 write("new ");
@@ -4871,6 +4886,8 @@ const _super = (function (geti, seti) {
                 write("check");
             }
 
+                    
+
             function emitTransientTypeTagFromType(type: Type) {
                 if (type.flags & TypeFlags.String ||
                     type.flags & TypeFlags.StringLiteral) {
@@ -4879,6 +4896,8 @@ const _super = (function (geti, seti) {
                     write("Number");
                 } else if (type.flags & TypeFlags.Boolean) {
                     write("Boolean");
+                } else if (type.flags & TypeFlags.ContainsAnyFunctionType) {
+                    write("Function");
                 } else if (type.symbol) {
                     // FIXME
                     write(type.symbol.name);
@@ -7883,7 +7902,6 @@ const _super = (function (geti, seti) {
             function emitCheckerDefinitions() {
                 write(`
 function check(val, ty) {
-
     function hasType(val, ty) {
         function primitive(ty) {
             return ty === Number ||
@@ -7894,8 +7912,12 @@ function check(val, ty) {
         if (primitive(ty)) 
             return ty(val) === val;
         else if (ty.constructor === Array) {
+            // This is a structural object type
+            for (var i = 0; i < ty.length; i++) {
+                if (val[ty[i]] === undefined)
+                    return false;
+            }
             return true;
-            // This is a structural object type, handle it
         } else {
             return val instanceof ty;
         }
@@ -7911,6 +7933,7 @@ function check(val, ty) {
         checkFail();
     }
 }
+
 `);
             }
             //[/CheckScript]               
