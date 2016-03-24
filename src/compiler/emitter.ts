@@ -5392,6 +5392,10 @@ const _super = (function (geti, seti) {
                     // any other preamble code we write (like parameter initializers).
                     startIndex = emitDirectivePrologues(ctor.body.statements, /*startWithNewLine*/ true);
                     emitDetachedCommentsAndUpdateCommentsInfo(ctor.body.statements);
+                    
+                    // [CheckScript]
+                    emitArgumentProtectors(ctor);
+                    // [/CheckScript]
                 }
                 emitCaptureThisForNodeIfNecessary(node);
                 let superCall: ExpressionStatement;
