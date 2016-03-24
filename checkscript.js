@@ -1,7 +1,4 @@
-
-
 function check(val, ty) {
-
     function hasType(val, ty) {
         function primitive(ty) {
             return ty === Number ||
@@ -12,8 +9,12 @@ function check(val, ty) {
         if (primitive(ty)) 
             return ty(val) === val;
         else if (ty.constructor === Array) {
+            // This is a structural object type
+            for (var i = 0; i < ty.length; i++) {
+                if (val[ty[i]] === undefined)
+                    return false;
+            }
             return true;
-            // This is a structural object type, handle it
         } else {
             return val instanceof ty;
         }
@@ -31,11 +32,3 @@ function check(val, ty) {
 }
 
 
-/* 
-Import with
-if (typeof $$cts$$runtime === "undefined") {
-    if (typeof require !== "undefined") require("./cts-runtime.js");
-    else if (typeof document !== "undefined") { document.writeLine("<script src=\"cts-runtime.js\"></script>"); }
-    else throw new Error("Could not load ConcreteTypeScript runtime!");
-}
-*/
