@@ -2232,6 +2232,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             //[CheckScript]
             function emitPropertyAccess(node: PropertyAccessExpression) {
                 if (node.checkedType && checkNeededForType(node.checkedType)) {
+                    if (node.parent && node.parent.kind === SyntaxKind.BinaryExpression && (<BinaryExpression>node.parent).operatorToken.kind === SyntaxKind.EqualsToken) {
+                        emitPropertyAccessWithoutCheck(node);
+                        return;
+                    }
                     emitCheckCall();
                     write("(");
                     emitPropertyAccessWithoutCheck(node);
@@ -4833,7 +4837,7 @@ const _super = (function (geti, seti) {
 
             // [CheckScript]
                 
-            function checkNeededForTypeNode(type: TypeNode) {            
+            function checkNeededForTypeNode(type: TypeNode) {    
                 switch (type.kind) {
                 case SyntaxKind.AnyKeyword:
                     return false;
