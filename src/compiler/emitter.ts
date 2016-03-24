@@ -2434,8 +2434,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
 
             //[CheckScript]
+                
             function emitCallExpression(node: CallExpression) {
-                if (node.checkedType) {
+                if (node.checkedType && checkNeededForType(node.checkedType)) {
                     emitCheckCall();
                     write("(");
                     emitCallExpressionWithoutCheck(node);
@@ -4817,9 +4818,32 @@ const _super = (function (geti, seti) {
 
             // [CheckScript]
                 
+            function checkNeededForTypeNode(type: TypeNode) {            
+                switch (type.kind) {
+                case SyntaxKind.AnyKeyword:
+                    return false;
+                default:
+                    return true
+                }
+            }
+
+            function checkNeededForType(type: Type) {   
+                if (type.flags & TypeFlags.Any) {
+                    return false;
+                } else if (type.flags & TypeFlags.Undefined) {
+                    return false;
+                } else if (type.flags & TypeFlags.Null) {
+                    return false;
+                } else if (type.flags & TypeFlags.Void) {
+                    return false;
+                } else  {
+                    return true;
+                }
+            }
+
             function emitArgumentProtectors(node: FunctionLikeDeclaration) {
                 forEach(node.parameters, param => {
-                    if (param.type) {
+                    if (param.type && checkNeededForTypeNode(param.type)) {
                         writeLine();
                         emitStart(param);
                         emitTransientVarCheck(param.name, param.type)
@@ -4844,7 +4868,7 @@ const _super = (function (geti, seti) {
             }
 
             function emitCheckCall() {
-                write("checkscript.check");
+                write("check");
             }
 
             function emitTransientTypeTagFromType(type: Type) {
@@ -4859,7 +4883,7 @@ const _super = (function (geti, seti) {
                     // FIXME
                     write(type.symbol.name);
                 } else {
-                    write("Any");
+                    write("Object");
                     //console.log(type);
                     //throw new Error("Cannot create dynamic type check!");
                 }
@@ -7855,12 +7879,49 @@ const _super = (function (geti, seti) {
                     }
                 }
             }
+            //[CheckScript]
+            function emitCheckerDefinitions() {
+                write(`
+function check(val, ty) {
+
+    function hasType(val, ty) {
+        function primitive(ty) {
+            return ty === Number ||
+                ty === String ||
+                ty === Boolean;
+        }
+
+        if (primitive(ty)) 
+            return ty(val) === val;
+        else if (ty.constructor === Array) {
+            return true;
+            // This is a structural object type, handle it
+        } else {
+            return val instanceof ty;
+        }
+    }
+
+    function checkFail() {
+        throw "Check failure!";
+    }
+    
+    if (hasType(val, ty)) {
+        return val;
+    } else {
+        checkFail();
+    }
+}
+`);
+            }
+            //[/CheckScript]               
 
             function emitSourceFileNode(node: SourceFile) {
                 // Start new file on new line
                 writeLine();
                 emitShebang();
                 emitDetachedCommentsAndUpdateCommentsInfo(node);
+
+                emitCheckerDefinitions(); //[CheckScript /]
 
                 if (isExternalModule(node) || compilerOptions.isolatedModules) {
                     if (isOwnFileEmit || (!isExternalModule(node) && compilerOptions.isolatedModules)) {
