@@ -1658,6 +1658,7 @@ namespace ts {
                 case SyntaxKind.SourceFile:
                     return emitSourceFile(<SourceFile>node);
             }
+            write(node.toString() + "fallthru")
         }
 
         /**

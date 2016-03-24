@@ -2434,12 +2434,27 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
 
             //[CheckScript]
-            function emitCallExpressionWithCheck(node: CallExpression) {
-                //emitTransientCheck(node, node.type);
-            }
-            //[/CheckScript]
-
             function emitCallExpression(node: CallExpression) {
+                if (node.checkedType) {
+                    emitCheckCall();
+                    write("(");
+                    emitCallExpressionWithoutCheck(node);
+                    write(",");
+                    emitTransientTypeTagFromType(node.checkedType);
+                    write(")");
+                } else {
+                    emitCallExpressionWithoutCheck(node);
+                }
+                //emitTransientCheck(node, node.type);
+                //[CheckScript TESTING]
+                //if (node.checkedType) {
+                //    write(" //");
+                //    emitTransientTypeTagFromType(node.checkedType);
+                //}
+                //[/CheckScript TESTING]
+            }
+
+            function emitCallExpressionWithoutCheck(node: CallExpression) {
                 if (languageVersion < ScriptTarget.ES6 && hasSpreadElement(node.arguments)) {
                     emitCallWithSpread(node);
                     return;
@@ -2472,13 +2487,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitCommaList(node.arguments);
                     write(")");
                 }
-                //[CheckScript TESTING]
-                if (node.checkedType) {
-                    write(" //");
-                    emitTransientTypeTagFromType(node.checkedType);
-                }
-                //[/CheckScript TESTING]
             }
+            //[/CheckScript]
 
             function emitNewExpression(node: NewExpression) {
                 write("new ");
@@ -4806,12 +4816,13 @@ const _super = (function (geti, seti) {
             }
 
             // [CheckScript]
+                
             function emitArgumentProtectors(node: FunctionLikeDeclaration) {
                 forEach(node.parameters, param => {
                     if (param.type) {
                         writeLine();
                         emitStart(param);
-                        emitTransientCheck(param.name, param.type)
+                        emitTransientVarCheck(param.name, param.type)
                         // emitCTSRT("cast");
                         // write("(");
                         // emitCTSTypeNode(<TypeNode>param.type);
@@ -4823,7 +4834,7 @@ const _super = (function (geti, seti) {
                 });
             }
 
-            function emitTransientCheck(name: Identifier | BindingPattern, type: TypeNode) {
+            function emitTransientVarCheck(name: Identifier | BindingPattern, type: TypeNode) {
                 emitCheckCall();
                 write("(");
                 emit(name);
@@ -4833,7 +4844,7 @@ const _super = (function (geti, seti) {
             }
 
             function emitCheckCall() {
-                write("//checkscript.check");
+                write("checkscript.check");
             }
 
             function emitTransientTypeTagFromType(type: Type) {
@@ -6216,15 +6227,26 @@ const _super = (function (geti, seti) {
             }
 
             //[CheckScript]
+            function emitPropertySignature(node: Declaration) {
+                emitVariableDeclaration(<VariableDeclaration>node);
+            }
             function emitInterfaceDeclaration(node: InterfaceDeclaration) {
-                write("interface ");
+                write("var ");
                 writeTextOfNode(currentText, node.name);
-                write(" {");
-                writeLine();
-                increaseIndent();
-                emitLines(node.members);
-                decreaseIndent();
-                write("}");
+                write(" = [");
+                //emitLines(node.members)
+                for (let i = 0; i < node.members.length; i++) {
+                    if (node.members[i].name) {
+                        write("\"");
+                        emitPropertySignature(node.members[i]);
+                        write("\", ");
+                    }
+                }
+                //for (const mem in node.members) {
+                //    emitPropertySignature(mem)
+                //    write(", ")
+               // }
+                write("]");
                 writeLine();
             }
             //[/CheckScript]
@@ -8145,7 +8167,15 @@ const _super = (function (geti, seti) {
                         return emitExportAssignment(<ExportAssignment>node);
                     case SyntaxKind.SourceFile:
                         return emitSourceFileNode(<SourceFile>node);
+                    //[CheckScript]
+                    //case SyntaxKind.PropertyDeclaration:
+                    //return write("PROPDEC")
+                    //case SyntaxKind.PropertySignature:
+                    
+                    //return emitPropertySignature(<PropertySignature>node);
+                    //[/CheckScript]
                 }
+                
             }
 
             function hasDetachedComments(pos: number) {
