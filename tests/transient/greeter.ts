@@ -1,4 +1,5 @@
 function greeter(person:string, x:Foo) {
+    x.blah
     return "Hello, " + person;
 }
 

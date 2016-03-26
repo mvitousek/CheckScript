@@ -21,7 +21,7 @@ function check(val, ty) {
     }
 
     function checkFail() {
-        throw "Check failure!";
+        throw new Error("Check failure!");
     }
     
     if (hasType(val, ty)) {
@@ -31,4 +31,6 @@ function check(val, ty) {
     }
 }
 
-
+if (typeof module !== 'undefined') {
+    module.exports.check = check;
+}

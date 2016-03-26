@@ -1151,6 +1151,8 @@ namespace ts {
     export interface ForOfStatement extends IterationStatement {
         initializer: VariableDeclarationList | Expression;
         expression: Expression;
+        elementCheck: Identifier | BindingPattern;
+        elementCheckType: Type;
     }
 
     // @kind(SyntaxKind.BreakStatement)

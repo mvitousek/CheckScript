@@ -2770,7 +2770,11 @@ namespace ts {
                 // missing properties/signatures required to get its iteratedType (like
                 // [Symbol.iterator] or next). This may be because we accessed properties from anyType,
                 // or it may have led to an error inside getElementTypeOfIterable.
-                return checkRightHandSideOfForOf((<ForOfStatement>declaration.parent.parent).expression) || anyType;
+                //[CheckScript]
+                var checkty = checkRightHandSideOfForOf((<ForOfStatement>declaration.parent.parent).expression) || anyType;
+                (<ForOfStatement>declaration.parent.parent).elementCheckType = checkty;
+                return checkty;
+                //[/CheckScript]
             }
 
             if (isBindingPattern(declaration.parent)) {
@@ -14033,6 +14037,11 @@ namespace ts {
             // Then check that the RHS is assignable to it.
             if (node.initializer.kind === SyntaxKind.VariableDeclarationList) {
                 checkForInOrForOfVariableDeclaration(node);
+                //[CheckScript]
+                // elementCheckType set in the above call
+                if ((<VariableDeclarationList>node.initializer).declarations[0].name.kind === SyntaxKind.Identifier)
+                    node.elementCheck = (<VariableDeclarationList>node.initializer).declarations[0].name;
+                //[/CheckScript]
             }
             else {
                 const varExpr = <Expression>node.initializer;
@@ -14077,7 +14086,7 @@ namespace ts {
                 if (variable && isBindingPattern(variable.name)) {
                     error(variable.name, Diagnostics.The_left_hand_side_of_a_for_in_statement_cannot_be_a_destructuring_pattern);
                 }
-
+                
                 checkForInOrForOfVariableDeclaration(node);
             }
             else {

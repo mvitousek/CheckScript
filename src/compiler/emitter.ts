@@ -2242,6 +2242,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     write(", ");
                     emitTransientTypeTagFromType(node.checkedType);
                     write(")");
+                    if (node.parent && node.parent.kind === SyntaxKind.CallExpression) {
+                        // FIXME: this is obviously bad since we'll duplicate computation
+                        write(".bind(");
+                        emit(node.expression);
+                        write(")");
+                    }
                 } else {
                     emitPropertyAccessWithoutCheck(node);
                 }
@@ -3255,14 +3261,28 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     convertedLoopState.allowedNonLabeledJumps = Jump.Break | Jump.Continue;
                 }
 
-                if (emitAsEmbeddedStatement) {
+                var needsCheckScriptCheck = !!(<ForOfStatement>node).elementCheck; //[CheckScript /]
+
+                if (emitAsEmbeddedStatement && needsCheckScriptCheck) { //[CheckScript /]
                     emitEmbeddedStatement(node.statement);
                 }
                 else if (node.statement.kind === SyntaxKind.Block) {
+                    //[CheckScript]
+                    if (needsCheckScriptCheck) {
+                        emitTransientVarCheck((<ForOfStatement>node).elementCheck, (<ForOfStatement>node).elementCheckType);
+                        writeLine();
+                    }
+                    //[/CheckScript]
                     emitLines((<Block>node.statement).statements);
                 }
                 else {
                     writeLine();
+                    //[CheckScript]
+                    if (needsCheckScriptCheck) {
+                        emitTransientVarCheck((<ForOfStatement>node).elementCheck, (<ForOfStatement>node).elementCheckType);
+                        writeLine();
+                    }
+                    //[/CheckScript]
                     emit(node.statement);
                 }
 
@@ -3468,7 +3488,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 }
                 emit(node.expression);
                 emitToken(SyntaxKind.CloseParenToken, node.expression.end);
-
+                
                 if (loop) {
                     emitConvertedLoopCall(loop, /*emitAsBlock*/ true);
                 }
@@ -4877,13 +4897,19 @@ const _super = (function (geti, seti) {
                 });
             }
 
-            function emitTransientVarCheck(name: Identifier | BindingPattern, type: TypeNode) {
+            function emitTransientVarCheck(name: Identifier | BindingPattern, type: TypeNode | Type) {
                 emitCheckCall();
                 write("(");
                 emit(name);
                 write(",");
-                emitTransientTypeTagFromTypeNode(type);
+                emitTransientTypeTag(type);
                 write(");");
+            }
+
+            function emitTransientTypeTag(type: TypeNode | Type) {
+                if ((<any>type).kind)
+                    emitTransientTypeTagFromTypeNode(<TypeNode> type);
+                else emitTransientTypeTagFromType(<Type> type);
             }
 
             function emitCheckCall() {
