@@ -2350,7 +2350,33 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 }
             }
 
+
+            //[CheckScript]
             function emitIndexedAccess(node: ElementAccessExpression) {
+                if (node.checkedType && checkNeededForType(node.checkedType)) {
+                    if (node.parent && node.parent.kind === SyntaxKind.BinaryExpression && (<BinaryExpression>node.parent).operatorToken.kind === SyntaxKind.EqualsToken) {
+                        emitIndexedAccessWithoutCheck(node);
+                        return;
+                    }
+                    emitCheckCall();
+                    write("(");
+                    emitIndexedAccessWithoutCheck(node);
+                    write(", ");
+                    emitTransientTypeTag(node.checkedType);
+                    write(")");
+                    if (node.parent && node.parent.kind === SyntaxKind.CallExpression) {
+                        // FIXME: this is obviously bad since we'll duplicate computation
+                        write(".bind(");
+                        emit(node.expression);
+                        write(")");
+                    }
+                } else {
+                    emitIndexedAccessWithoutCheck(node);
+                }
+            }
+            //[/CheckScript]
+
+            function emitIndexedAccessWithoutCheck(node: ElementAccessExpression) { // [CheckScript RENAMED FROM emitIndexedAccess /]
                 if (tryEmitConstantValue(node)) {
                     return;
                 }
@@ -3263,12 +3289,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 
                 var needsCheckScriptCheck = !!(<ForOfStatement>node).elementCheck; //[CheckScript /]
 
-                if (emitAsEmbeddedStatement && needsCheckScriptCheck) { //[CheckScript /]
+                if (emitAsEmbeddedStatement && !needsCheckScriptCheck) { //[CheckScript /]
                     emitEmbeddedStatement(node.statement);
                 }
                 else if (node.statement.kind === SyntaxKind.Block) {
                     //[CheckScript]
                     if (needsCheckScriptCheck) {
+                        writeLine();
                         emitTransientVarCheck((<ForOfStatement>node).elementCheck, (<ForOfStatement>node).elementCheckType);
                         writeLine();
                     }
@@ -3279,6 +3306,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     writeLine();
                     //[CheckScript]
                     if (needsCheckScriptCheck) {
+                        writeLine();
                         emitTransientVarCheck((<ForOfStatement>node).elementCheck, (<ForOfStatement>node).elementCheckType);
                         writeLine();
                     }
@@ -4886,12 +4914,6 @@ const _super = (function (geti, seti) {
                         writeLine();
                         emitStart(param);
                         emitTransientVarCheck(param.name, param.type)
-                        // emitCTSRT("cast");
-                        // write("(");
-                        // emitCTSTypeNode(<TypeNode>param.type);
-                        // write(",");
-                        // emitNode(param.name);
-                        // write(");");
                         emitEnd(param);
                     }
                 });
@@ -4901,7 +4923,7 @@ const _super = (function (geti, seti) {
                 emitCheckCall();
                 write("(");
                 emit(name);
-                write(",");
+                write(", ");
                 emitTransientTypeTag(type);
                 write(");");
             }

@@ -2772,7 +2772,7 @@ namespace ts {
                 // or it may have led to an error inside getElementTypeOfIterable.
                 //[CheckScript]
                 var checkty = checkRightHandSideOfForOf((<ForOfStatement>declaration.parent.parent).expression) || anyType;
-                (<ForOfStatement>declaration.parent.parent).elementCheckType = checkty;
+                (<ForOfStatement>declaration.parent.parent).elementCheckType = normalizeFunctionType(checkty);
                 return checkty;
                 //[/CheckScript]
             }
@@ -9611,11 +9611,7 @@ namespace ts {
             //[CheckScript]
             const retty = node.kind === SyntaxKind.PropertyAccessExpression && prop.flags & SymbolFlags.Property ?
                 getNarrowedTypeOfReference(propType, <PropertyAccessExpression>node) : propType;
-            if (isFunctionType(retty)) {
-                node.checkedType = anyFunctionType;
-            } else {
-                node.checkedType = retty
-            }
+            node.checkedType = normalizeFunctionType(retty);
             return retty;
             //[/CheckScript]
         }
@@ -9732,7 +9728,11 @@ namespace ts {
                     const prop = getPropertyOfType(objectType, name);
                     if (prop) {
                         getNodeLinks(node).resolvedSymbol = prop;
-                        return getTypeOfSymbol(prop);
+                        //[CheckScript]
+                        var checkty = getTypeOfSymbol(prop);
+                        node.checkedType = normalizeFunctionType(checkty);
+                        return checkty;
+                        //[/CheckScript]
                     }
                     else if (isConstEnum) {
                         error(node.argumentExpression, Diagnostics.Property_0_does_not_exist_on_const_enum_1, name, symbolToString(objectType.symbol));
@@ -9749,7 +9749,11 @@ namespace ts {
                     const numberIndexInfo = getIndexInfoOfType(objectType, IndexKind.Number);
                     if (numberIndexInfo) {
                         getNodeLinks(node).resolvedIndexInfo = numberIndexInfo;
-                        return numberIndexInfo.type;
+                        //[CheckScript]
+                        var checkty = numberIndexInfo.type;
+                        node.checkedType = normalizeFunctionType(checkty);
+                        return checkty;
+                        //[/CheckScript]
                     }
                 }
 
@@ -9757,7 +9761,11 @@ namespace ts {
                 const stringIndexInfo = getIndexInfoOfType(objectType, IndexKind.String);
                 if (stringIndexInfo) {
                     getNodeLinks(node).resolvedIndexInfo = stringIndexInfo;
-                    return stringIndexInfo.type;
+                    //[CheckScript]
+                    var checkty = stringIndexInfo.type;
+                    node.checkedType = normalizeFunctionType(checkty);
+                    return checkty;
+                    //[/CheckScript]
                 }
 
                 // Fall back to any.
@@ -11017,10 +11025,20 @@ namespace ts {
 
             //[CheckScript]
             const retty = getReturnTypeOfSignature(signature);
-            node.checkedType = retty
+            node.checkedType = normalizeFunctionType(retty);
             return retty
             //[/CheckScript]
         }
+
+        //[CheckScript]
+        function normalizeFunctionType(ty: Type): Type {
+            if (isFunctionType(ty)) {
+                return anyFunctionType;
+            } else {
+                return ty;
+            }
+        }
+        //[/CheckScript]
 
         function checkTaggedTemplateExpression(node: TaggedTemplateExpression): Type {
             return getReturnTypeOfSignature(getResolvedSignature(node));
