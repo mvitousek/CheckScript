@@ -4941,15 +4941,27 @@ const _super = (function (geti, seti) {
                     
 
             function emitTransientTypeTagFromType(type: Type) {
+                if (type == undefined) 
+                    return;
                 if (type.flags & TypeFlags.String ||
                     type.flags & TypeFlags.StringLiteral) {
-                    write("String");
+                    write("'string'");
                 } else if (type.flags & TypeFlags.Number) {
-                    write("Number");
+                    write("'number'");
                 } else if (type.flags & TypeFlags.Boolean) {
-                    write("Boolean");
+                    write("'boolean'");
                 } else if (type.flags & TypeFlags.ContainsAnyFunctionType) {
                     write("Function");
+                } else if (type.flags & TypeFlags.Union && (<UnionOrIntersectionType>type).types) {
+                    write("new Union(");
+                    var first = true;
+                    for (var ty of (<UnionType>type).types) {
+                        if (!first)
+                            write(", ");
+                        first = false;
+                        emitTransientTypeTagFromType(ty);
+                    }
+                    return write(")");
                 } else if (type.symbol) {
                     // FIXME
                     write(type.symbol.name);
@@ -4960,7 +4972,7 @@ const _super = (function (geti, seti) {
                 }
             }
 
-            function emitTransientTypeTagFromTypeNode(type: TypeNode) {
+                function emitTransientTypeTagFromTypeNode(type: TypeNode):any {
                 function emitEntityName(entityName: EntityName) {
                     if (entityName.kind === SyntaxKind.Identifier) {
                         writeTextOfNode(currentText, entityName);
@@ -4978,15 +4990,29 @@ const _super = (function (geti, seti) {
                     return write("Object");
                 case SyntaxKind.StringKeyword:
                 case SyntaxKind.StringLiteral:
-                    return write("String");
+                    return write("'string'");
                 case SyntaxKind.NumberKeyword:
-                    return write("Number");
+                    return write("'number'");
                 case SyntaxKind.BooleanKeyword:
-                    return write("Boolean");
+                    return write("'boolean'");
+                case SyntaxKind.ParenthesizedType:
+                    return emitTransientTypeTagFromTypeNode((<ParenthesizedTypeNode>type).type);
+                case SyntaxKind.UnionType:
+                    write("new Union(");
+                    var first = true;
+                    for (var ty of (<UnionTypeNode>type).types) {
+                        if (!first)
+                            write(", ");
+                        first = false;
+                        emitTransientTypeTagFromTypeNode(ty);
+                    }
+                    return write(")");
+                case SyntaxKind.ArrayType:
+                    return write("Array");
                 case SyntaxKind.TypeReference:
                     return emitEntityName((<TypeReferenceNode>type).typeName);
                 default:
-                    //Debug.fail("Unsupported CheckScript type: " + type.kind);
+                    // return Debug.fail("Unsupported CheckScript type: " + type.kind);
                 }
             }
             // [/CheckScript] 
@@ -7960,27 +7986,38 @@ const _super = (function (geti, seti) {
 function check(val, ty) {
     function hasType(val, ty) {
         function primitive(ty) {
-            return ty === Number ||
-                ty === String ||
-                ty === Boolean;
+            return ty === 'number' ||
+                ty === 'string' ||
+                ty === 'boolean';
         }
 
         if (primitive(ty)) 
-            return ty(val) === val;
-        else if (ty.constructor === Array) {
+            // faster to do typeof val === 'ty'
+            return typeof val === ty;
+        else if (ty === Array) {
+            return val.constructor === Array;
+        } else if (ty.constructor === Array) {
             // This is a structural object type
+            if (typeof val !== 'object')
+                return false;
             for (var i = 0; i < ty.length; i++) {
-                if (val[ty[i]] === undefined)
+                if (!(ty[i] in val))
                     return false;
             }
             return true;
+        } else if (ty instanceof Union) {
+            for (var j = 0; j < ty.types.length; j++) {
+                if (hasType(val, ty.types[j]))
+                    return true;
+            }
+            return false;
         } else {
             return val instanceof ty;
         }
     }
 
     function checkFail() {
-        throw "Check failure!";
+        throw new Error("Check failure!");
     }
     
     if (hasType(val, ty)) {
@@ -7989,6 +8026,11 @@ function check(val, ty) {
         checkFail();
     }
 }
+
+function Union() {
+    this.types = Array.prototype.slice.call(arguments);
+    return this;
+} 
 
 `);
             }
