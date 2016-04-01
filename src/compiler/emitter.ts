@@ -2497,13 +2497,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 } else {
                     emitCallExpressionWithoutCheck(node);
                 }
-                //emitTransientCheck(node, node.type);
-                //[CheckScript TESTING]
-                //if (node.checkedType) {
-                //    write(" //");
-                //    emitTransientTypeTagFromType(node.checkedType);
-                //}
-                //[/CheckScript TESTING]
             }
             //[/CheckScript]
 
@@ -2538,6 +2531,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 else {
                     write("(");
                     emitCommaList(node.arguments);
+                    //[CheckScript]
+                    if (node.typeArguments) {
+                        for (var tyarg of node.typeArguments) {
+                            write(", ");
+                            emitTransientTypeTag(tyarg);
+                        }
+                    }
+                    //[/CheckScript]
                     write(")");
                 }
             }
@@ -4489,6 +4490,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 return false;
             }
 
+
             function emitParameter(node: ParameterDeclaration) {
                 if (languageVersion < ScriptTarget.ES6) {
                     if (isBindingPattern(node.name)) {
@@ -4511,6 +4513,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitOptional(" = ", node.initializer);
                 }
             }
+
+
+            //[CheckScript]
+            function emitTypeParameter(node: TypeParameterDeclaration) {
+                emit(node.name);
+            }
+            //[/CheckScript]
 
             function emitDefaultValueAssignments(node: FunctionLikeDeclaration) {
                 if (languageVersion < ScriptTarget.ES6) {
@@ -4721,6 +4730,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     const parameters = node.parameters;
                     const omitCount = languageVersion < ScriptTarget.ES6 && hasRestParameter(node) ? 1 : 0;
                     emitList(parameters, 0, parameters.length - omitCount, /*multiLine*/ false, /*trailingComma*/ false);
+                    //[CheckScript]
+                    if (node.typeParameters && node.typeParameters.length > 0) {
+                        write(", ");
+                        emitList(node.typeParameters, 0, node.typeParameters.length, /*multiLine*/ false, /*trailingComma*/ false);
+                    }
+                    //[/CheckScript]
                 }
                 write(")");
                 decreaseIndent();
@@ -4906,6 +4921,15 @@ const _super = (function (geti, seti) {
                 } else  {
                     return true;
                 }
+            }
+
+            function argumentProtectorsNeeded(node: FunctionLikeDeclaration) {
+                for (var param of node.parameters) {
+                    if (param.type && checkNeededForTypeNode(param.type)) {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             function emitArgumentProtectors(node: FunctionLikeDeclaration) {
@@ -5144,11 +5168,12 @@ const _super = (function (geti, seti) {
 
                 const preambleEmitted = writer.getTextPos() !== initialTextPos;
 
-                if (!preambleEmitted && nodeEndIsOnSameLineAsNodeStart(body, body)) {
+                if (!preambleEmitted && nodeEndIsOnSameLineAsNodeStart(body, body) && !argumentProtectorsNeeded(node)) { //[CheckScript arg protectors needed /]
                     for (const statement of body.statements) {
                         write(" ");
                         emit(statement);
                     }
+                    
                     emitTempDeclarations(/*newLine*/ false);
                     write(" ");
                     emitLeadingCommentsOfPosition(body.statements.end);
@@ -8186,6 +8211,10 @@ function Union() {
                 switch (node.kind) {
                     case SyntaxKind.Identifier:
                         return emitIdentifier(<Identifier>node);
+                    //[CheckScript]
+                    case SyntaxKind.TypeParameter:
+                        return emitTypeParameter(<TypeParameterDeclaration>node);
+                    //[/CheckScript]
                     case SyntaxKind.Parameter:
                         return emitParameter(<ParameterDeclaration>node);
                     case SyntaxKind.MethodDeclaration:

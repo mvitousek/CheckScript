@@ -6,13 +6,13 @@ function check(val, ty) {
                 ty === 'boolean';
         }
 
-        if (primitive(ty)) 
-            // faster to do typeof val === 'ty'
+        if (!ty)
+            return true;
+        else if (primitive(ty)) 
             return typeof val === ty;
         else if (ty === Array) {
             return val.constructor === Array;
         } else if (ty.constructor === Array) {
-            // This is a structural object type
             if (typeof val !== 'object')
                 return false;
             for (var i = 0; i < ty.length; i++) {
