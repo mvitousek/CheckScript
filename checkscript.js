@@ -47,6 +47,7 @@ function Union() {
     return this;
 } 
 
-if (typeof module !== 'undefined') {
-    module.exports.check = check;
+function TypeArgs(tys) {
+    this.types = Array.prototype.slice.call(arguments);
+    return this;
 }

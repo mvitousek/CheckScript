@@ -988,6 +988,7 @@ namespace ts {
     export interface CallExpression extends LeftHandSideExpression, Declaration {
         expression: LeftHandSideExpression;
         typeArguments?: NodeArray<TypeNode>;
+        typeArgumentTypes?: Type[]; //[CheckScript /]
         arguments: NodeArray<Expression>;
     }
 

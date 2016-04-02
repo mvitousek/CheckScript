@@ -10655,9 +10655,9 @@ namespace ts {
                         : undefined;
 
                     while (true) {
+                        let typeArgumentTypes: Type[];
                         candidate = originalCandidate;
                         if (candidate.typeParameters) {
-                            let typeArgumentTypes: Type[];
                             if (typeArguments) {
                                 typeArgumentTypes = map(typeArguments, getTypeFromTypeNode);
                                 typeArgumentsAreValid = checkTypeArguments(candidate, typeArguments, typeArgumentTypes, /*reportErrors*/ false);
@@ -10677,6 +10677,11 @@ namespace ts {
                         }
                         const index = excludeArgument ? indexOf(excludeArgument, true) : -1;
                         if (index < 0) {
+                            //[CheckScript]
+                            if (node.kind === SyntaxKind.CallExpression && typeArgumentTypes && typeArgumentTypes.length > 0) {
+                                (<CallExpression>node).typeArgumentTypes = typeArgumentTypes;
+                            }
+                            //[/CheckScript]
                             return candidate;
                         }
                         excludeArgument[index] = false;

@@ -2532,11 +2532,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     write("(");
                     emitCommaList(node.arguments);
                     //[CheckScript]
-                    if (node.typeArguments) {
-                        for (var tyarg of node.typeArguments) {
-                            write(", ");
-                            emitTransientTypeTag(tyarg);
-                        }
+                    if (node.typeArgumentTypes && node.typeArgumentTypes.length > 0) {
+                        write(", ");
+                        emitTransientTypeArguments(node.typeArgumentTypes);
                     }
                     //[/CheckScript]
                     write(")");
@@ -4732,8 +4730,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitList(parameters, 0, parameters.length - omitCount, /*multiLine*/ false, /*trailingComma*/ false);
                     //[CheckScript]
                     if (node.typeParameters && node.typeParameters.length > 0) {
-                        write(", ");
-                        emitList(node.typeParameters, 0, node.typeParameters.length, /*multiLine*/ false, /*trailingComma*/ false);
+                        write(", chs_polys");
                     }
                     //[/CheckScript]
                 }
@@ -4942,6 +4939,48 @@ const _super = (function (geti, seti) {
                     }
                 });
             }
+
+            function emitTransientTypeArguments(types: Type[]) {
+                write("new TypeArgs(");
+                var first = true
+                for (var tyarg of types) {
+                    if(!first)
+                        write(", ");
+                    first = false;
+                    emitTransientTypeTag(tyarg);
+                }
+                write(")");
+            }
+
+            function emitPolymorphismHandler(node: FunctionLikeDeclaration) {
+                writeLine();
+                for (var i = 0; i < node.typeParameters.length; i++) {
+                    write("var ");
+                    emit(node.typeParameters[i]);
+                    write(";");
+                    writeLine();
+                }
+                write("if (this['chs_polys'] && chs_polys instanceof TypeArgs) {")
+                writeLine();
+                increaseIndent();
+                for (var i = 0; i < node.typeParameters.length; i++) {
+                    emit(node.typeParameters[i]);
+                    write(" = chs_polys.types[" + i + "];");
+                    writeLine();
+                }
+                decreaseIndent();
+                write("} else {")
+                writeLine();
+                increaseIndent();
+                for (var i = 0; i < node.typeParameters.length; i++) {
+                    emit(node.typeParameters[i]);
+                    write(" = undefined;");
+                    writeLine();
+                }
+                decreaseIndent();
+                write("}");
+            }
+
 
             function emitTransientVarCheck(name: Identifier | BindingPattern, type: TypeNode | Type) {
                 emitCheckCall();
@@ -5181,6 +5220,9 @@ const _super = (function (geti, seti) {
                 else {
                     increaseIndent();
                     // [CheckScript]
+                    if (node.typeParameters) {
+                        emitPolymorphismHandler(node);
+                    }
                     emitArgumentProtectors(node);
                     // [/CheckScript]
                     emitLinesStartingAt(body.statements, startIndex);
@@ -8016,13 +8058,13 @@ function check(val, ty) {
                 ty === 'boolean';
         }
 
-        if (primitive(ty)) 
-            // faster to do typeof val === 'ty'
+        if (!ty)
+            return true;
+        else if (primitive(ty)) 
             return typeof val === ty;
         else if (ty === Array) {
             return val.constructor === Array;
         } else if (ty.constructor === Array) {
-            // This is a structural object type
             if (typeof val !== 'object')
                 return false;
             for (var i = 0; i < ty.length; i++) {
@@ -8056,6 +8098,12 @@ function Union() {
     this.types = Array.prototype.slice.call(arguments);
     return this;
 } 
+
+function TypeArgs(tys) {
+    this.types = Array.prototype.slice.call(arguments);
+    return this;
+}
+
 
 `);
             }
