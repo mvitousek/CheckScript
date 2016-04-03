@@ -5,7 +5,7 @@ function f<X>(x:X[]) : X {
 }
 
 function g<Y>(h:Y[]) : Y {
-  return f<Y>(h)
+  return f(h)
 }
 
 function multi<X, Y>(a:X, b:Y) { }

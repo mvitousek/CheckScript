@@ -6434,20 +6434,17 @@ const _super = (function (geti, seti) {
             function emitInterfaceDeclaration(node: InterfaceDeclaration) {
                 write("var ");
                 writeTextOfNode(currentText, node.name);
-                write(" = [");
-                //emitLines(node.members)
+                write(" = ['");
+                var first = true;
                 for (let i = 0; i < node.members.length; i++) {
                     if (node.members[i].name) {
-                        write("\"");
+                        if (!first)
+                            write("', '");
+                        first = false;
                         emitPropertySignature(node.members[i]);
-                        write("\", ");
                     }
                 }
-                //for (const mem in node.members) {
-                //    emitPropertySignature(mem)
-                //    write(", ")
-               // }
-                write("]");
+                write("'];");
                 writeLine();
             }
             //[/CheckScript]
