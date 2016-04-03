@@ -5025,8 +5025,17 @@ const _super = (function (geti, seti) {
                         emitTransientTypeTagFromType(ty);
                     }
                     return write(")");
+                } else if (type.flags & TypeFlags.Anonymous && (<ResolvedType>type).properties) { 
+                    write("['");
+                    var first = true;
+                    for (var n of (<ResolvedType>type).properties) {
+                        if (!first)
+                            write("', '");
+                        first = false;
+                        write(n.name);
+                    }
+                    write("']");
                 } else if (type.symbol) {
-                    // FIXME
                     write(type.symbol.name);
                 } else {
                     write("Object");
@@ -5035,7 +5044,7 @@ const _super = (function (geti, seti) {
                 }
             }
 
-                function emitTransientTypeTagFromTypeNode(type: TypeNode):any {
+            function emitTransientTypeTagFromTypeNode(type: TypeNode):any {
                 function emitEntityName(entityName: EntityName) {
                     if (entityName.kind === SyntaxKind.Identifier) {
                         writeTextOfNode(currentText, entityName);
