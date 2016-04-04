@@ -974,6 +974,7 @@ namespace ts {
         expression: LeftHandSideExpression;
         dotToken: Node;
         name: Identifier;
+        optional?: boolean //[CheckScript /]
     }
 
     export type IdentifierOrPropertyAccess = Identifier | PropertyAccessExpression;

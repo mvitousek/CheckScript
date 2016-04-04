@@ -2241,6 +2241,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitPropertyAccessWithoutCheck(node);
                     write(", ");
                     emitTransientTypeTagFromType(node.checkedType);
+                    if (node.optional)
+                        write(", /* optional */ true");
                     write(")");
                     if (node.parent && node.parent.kind === SyntaxKind.CallExpression) {
                         // FIXME: this is obviously bad since we'll duplicate computation
@@ -5025,6 +5027,16 @@ const _super = (function (geti, seti) {
                         emitTransientTypeTagFromType(ty);
                     }
                     return write(")");
+                } else if (type.flags & TypeFlags.Intersection && (<UnionOrIntersectionType>type).types) {
+                    write("new Intersection(");
+                    var first = true;
+                    for (var ty of (<UnionType>type).types) {
+                        if (!first)
+                            write(", ");
+                        first = false;
+                        emitTransientTypeTagFromType(ty);
+                    }
+                    return write(")");
                 } else if (type.flags & TypeFlags.Anonymous && (<ResolvedType>type).properties) { 
                     write("['");
                     var first = true;
@@ -5073,6 +5085,16 @@ const _super = (function (geti, seti) {
                     write("new Union(");
                     var first = true;
                     for (var ty of (<UnionTypeNode>type).types) {
+                        if (!first)
+                            write(", ");
+                        first = false;
+                        emitTransientTypeTagFromTypeNode(ty);
+                    }
+                    return write(")");
+                case SyntaxKind.IntersectionType:
+                    write("new Intersection(");
+                    var first = true;
+                    for (var ty of (<IntersectionTypeNode>type).types) {
                         if (!first)
                             write(", ");
                         first = false;
@@ -6434,18 +6456,46 @@ const _super = (function (geti, seti) {
             function emitInterfaceDeclaration(node: InterfaceDeclaration) {
                 write("var ");
                 writeTextOfNode(currentText, node.name);
-                write(" = ['");
-                var first = true;
-                for (let i = 0; i < node.members.length; i++) {
-                    if (node.members[i].name) {
+                write(" = ");
+                
+                if (node.heritageClauses) {
+                    write("new Intersection(");
+                    emitInterfaceMembers();
+                    for (var clause of node.heritageClauses) {
+                        // I think there should only ever be one HeritageClause, but not sure
+                        write(", ");
+                        emitHeritageClause(clause);
+                    }
+                    write(")");
+                } else {
+                    emitInterfaceMembers();
+                }
+                write(";");
+                writeLine();
+
+                function emitHeritageClause(clause: HeritageClause) {
+                    var first = true;
+                    for (var exp of clause.types) {
                         if (!first)
-                            write("', '");
+                            write(", ");
                         first = false;
-                        emitPropertySignature(node.members[i]);
+                        emit(exp.expression);
                     }
                 }
-                write("'];");
-                writeLine();
+
+                function emitInterfaceMembers() {
+                    write("['");
+                    var first = true;
+                    for (let i = 0; i < node.members.length; i++) {
+                        if (node.members[i].name && !node.members[i].questionToken) {
+                            if (!first)
+                                write("', '");
+                            first = false;
+                            emitPropertySignature(node.members[i]);
+                        }
+                    }
+                    write("']");
+                }
             }
             //[/CheckScript]
 

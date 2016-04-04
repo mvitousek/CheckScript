@@ -9612,6 +9612,8 @@ namespace ts {
             const retty = node.kind === SyntaxKind.PropertyAccessExpression && prop.flags & SymbolFlags.Property ?
                 getNarrowedTypeOfReference(propType, <PropertyAccessExpression>node) : propType;
             node.checkedType = normalizeFunctionType(retty);
+            if (node.kind === SyntaxKind.PropertyAccessExpression && prop.flags & SymbolFlags.Optional)
+                (<PropertyAccessExpression>node).optional = true; 
             return retty;
             //[/CheckScript]
         }

@@ -1,4 +1,4 @@
-function check(val, ty) {
+function check(val, ty, nullable) {
     function hasType(val, ty) {
         function primitive(ty) {
             return ty === 'number' ||
@@ -26,6 +26,12 @@ function check(val, ty) {
                     return true;
             }
             return false;
+        } else if (ty instanceof Intersection) {
+            for (var j = 0; j < ty.types.length; j++) {
+                if (!hasType(val, ty.types[j]))
+                    return false;
+            }
+            return true;
         } else {
             return val instanceof ty;
         }
@@ -35,7 +41,7 @@ function check(val, ty) {
         throw new Error("Check failure!");
     }
     
-    if (hasType(val, ty)) {
+    if (hasType(val, ty) || (nullable && val == null)) {
         return val;
     } else {
         checkFail();
@@ -43,6 +49,11 @@ function check(val, ty) {
 }
 
 function Union() {
+    this.types = Array.prototype.slice.call(arguments);
+    return this;
+} 
+
+function Intersection() {
     this.types = Array.prototype.slice.call(arguments);
     return this;
 } 
