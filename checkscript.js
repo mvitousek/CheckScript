@@ -38,7 +38,7 @@ function check(val, ty, nullable) {
     }
 
     function checkFail() {
-        throw new Error("Check failure!");
+        throw new Error("Check failure! " + val + " does not have type " + ty);
     }
     
     if (hasType(val, ty) || (nullable && val == null)) {
@@ -58,7 +58,7 @@ function Intersection() {
     return this;
 } 
 
-function TypeArgs(tys) {
+function TypeArgs() {
     this.types = Array.prototype.slice.call(arguments);
     return this;
 }

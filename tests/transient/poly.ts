@@ -10,6 +10,10 @@ function g<Y>(h:Y[]) : Y {
 
 function multi<X, Y>(a:X, b:Y) { }
 
+function joint<X>(a:X, b:X):X { return a; }
+
+joint(42,20);
+
 g<number>([1])
 h(10)
 

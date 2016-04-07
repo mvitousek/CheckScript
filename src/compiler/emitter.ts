@@ -4647,6 +4647,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 if (languageVersion < ScriptTarget.ES6 && hasRestParameter(node)) {
                     const restIndex = node.parameters.length - 1;
                     const restParam = node.parameters[restIndex];
+                    //[CheckScript]
+                    const restType = restParam.type;
 
                     // A rest parameter cannot have a binding pattern, so let's just ignore it if it does.
                     if (isBindingPattern(restParam.name)) {
@@ -4663,13 +4665,28 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitEnd(restParam);
                     emitTrailingComments(restParam);
                     writeLine();
+                    //[CheckScript]
+                    if (node.typeParameters && node.typeParameters.length > 0) {
+                        var chs_minus = createTempVariable(TempFlags._i).text;
+                        write("var chs_polys = arguments[arguments.length - 1];")
+                        writeLine();
+                        emitPolymorphismHandler(node, chs_minus);
+                        writeLine();
+                    }
+                    //[/CheckScript]
                     write("for (");
                     emitStart(restParam);
                     write("var " + tempName + " = " + restIndex + ";");
                     emitEnd(restParam);
                     write(" ");
                     emitStart(restParam);
-                    write(tempName + " < arguments.length;");
+                    //[CheckScript]
+                    if (node.typeParameters && node.typeParameters.length > 0) {
+                        write(tempName + " < arguments.length - " + chs_minus + ";");
+                    } else {
+                    //[/CheckScript]
+                        write(tempName + " < arguments.length;");
+                    }
                     emitEnd(restParam);
                     write(" ");
                     emitStart(restParam);
@@ -4680,7 +4697,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     writeLine();
                     emitStart(restParam);
                     emitNodeWithCommentsAndWithoutSourcemap(restParam.name);
-                    write("[" + tempName + " - " + restIndex + "] = arguments[" + tempName + "];");
+                    //[CheckScript]
+                    if (checkNeededForTypeNode(restType) &&
+                        restType.kind === SyntaxKind.ArrayType &&
+                        checkNeededForTypeNode((<ArrayTypeNode>restType).elementType)) {
+                        write("[" + tempName + " - " + restIndex + "] = check(arguments[" + tempName + "], ");
+                        emitTransientTypeTag((<ArrayTypeNode>restType).elementType);
+                        write(");");
+                    } else {
+                    //[/CheckScript]
+                        write("[" + tempName + " - " + restIndex + "] = arguments[" + tempName + "];");
+                    }
                     emitEnd(restParam);
                     decreaseIndent();
                     writeLine();
@@ -4801,7 +4828,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     const omitCount = languageVersion < ScriptTarget.ES6 && hasRestParameter(node) ? 1 : 0;
                     emitList(parameters, 0, parameters.length - omitCount, /*multiLine*/ false, /*trailingComma*/ false);
                     //[CheckScript]
-                    if (node.typeParameters && node.typeParameters.length > 0) {
+                    if (node.typeParameters && node.typeParameters.length > 0 && !hasRestParameter(node)) {
                         write(", chs_polys");
                     }
                     //[/CheckScript]
@@ -5002,8 +5029,12 @@ const _super = (function (geti, seti) {
             }
 
             function emitArgumentProtectors(node: FunctionLikeDeclaration) {
+                var rest:ParameterDeclaration;
+                if (hasRestParameter(node))
+                    rest = node.parameters[node.parameters.length - 1];
+
                 forEach(node.parameters, param => {
-                    if (param.type && checkNeededForTypeNode(param.type)) {
+                    if (param !== rest && param.type && checkNeededForTypeNode(param.type)) {
                         writeLine();
                         emitStart(param);
                         emitTransientVarCheck(param.name, param.type)
@@ -5024,13 +5055,17 @@ const _super = (function (geti, seti) {
                 write(")");
             }
 
-            function emitPolymorphismHandler(node: FunctionLikeDeclaration) {
+            function emitPolymorphismHandler(node: FunctionLikeDeclaration, ...polyname:string[]) {
                 writeLine();
                 for (var i = 0; i < node.typeParameters.length; i++) {
                     write("var ");
                     emit(node.typeParameters[i]);
                     write(";");
                     writeLine();
+                }
+                if (hasRestParameter(node)) {
+                    write("var " + polyname[0] + ";");
+                    writeLine()
                 }
                 write("if (this['chs_polys'] && chs_polys instanceof TypeArgs) {")
                 writeLine();
@@ -5040,6 +5075,10 @@ const _super = (function (geti, seti) {
                     write(" = chs_polys.types[" + i + "];");
                     writeLine();
                 }
+                if (hasRestParameter(node)) {
+                    write(polyname[0] + " = 1;");
+                    writeLine();
+                }
                 decreaseIndent();
                 write("} else {")
                 writeLine();
@@ -5047,6 +5086,10 @@ const _super = (function (geti, seti) {
                 for (var i = 0; i < node.typeParameters.length; i++) {
                     emit(node.typeParameters[i]);
                     write(" = undefined;");
+                    writeLine();
+                }
+                if (hasRestParameter(node)) {
+                    write(polyname[0] + " = 0;");
                     writeLine();
                 }
                 decreaseIndent();
@@ -5324,7 +5367,8 @@ const _super = (function (geti, seti) {
                 else {
                     increaseIndent();
                     // [CheckScript]
-                    if (node.typeParameters) {
+                    if (node.typeParameters && !hasRestParameter(node)) { 
+                        // If it has a rest parameter, we handle this while emitting the rest handler 
                         emitPolymorphismHandler(node);
                     }
                     emitArgumentProtectors(node);
