@@ -2230,6 +2230,73 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
 
             //[CheckScript]
+            function emitTypeAssertionExpression(node: TypeAssertion) {
+                if (parentHasKindModuloParens(node, SyntaxKind.PropertyAccessExpression) && inQueryContext(findNonParenthesizedParent(node))) {
+                    return emit(node.expression);
+                }
+                emitCheckCall();
+                write("(");
+                emit(node.expression);
+                write(", ");
+                emitTransientTypeTag(node.type);
+                write(")");
+            }
+
+
+            function emitAsExpression(node: AsExpression) {
+                if (parentHasKindModuloParens(node, SyntaxKind.VariableDeclaration) &&
+                    !hasKindModuloParens(node.expression, SyntaxKind.Identifier)) {
+                    return emit(node.expression);
+                }
+                emitCheckCall();
+                write("(");
+                emit(node.expression);
+                write(", ");
+                emitTransientTypeTag(node.type);
+                write(")");
+            }
+
+            function inQueryContext(node: Node) : boolean {
+                if (!node.parent)
+                    return false;
+                if ((node.parent.kind === SyntaxKind.IfStatement && (<IfStatement>node.parent).expression == node)
+                    || (node.parent.kind === SyntaxKind.ConditionalExpression && (<ConditionalExpression>node.parent).condition == node))
+                    return true;
+                if (node.parent.kind === SyntaxKind.BinaryExpression &&
+                    ((<BinaryExpression>node.parent).operatorToken.kind === SyntaxKind.AmpersandAmpersandToken ||
+                     (<BinaryExpression>node.parent).operatorToken.kind === SyntaxKind.BarBarToken))
+                    return inQueryContext(node.parent);
+                if (node.parent.kind === SyntaxKind.ParenthesizedExpression)
+                    return inQueryContext(node.parent);
+                return false;
+            }
+
+            function findNonParenthesizedParent(node: Node) : Node {
+                if (!node.parent) 
+                    return node;
+                if (node.parent.kind === SyntaxKind.ParenthesizedExpression)
+                    return findNonParenthesizedParent(node.parent);
+                return node.parent;
+            }
+
+            function hasKindModuloParens(node: Node, kind: number) : boolean {
+                if (node.kind === kind)
+                    return true;
+                if (node.kind === SyntaxKind.ParenthesizedExpression)
+                    return hasKindModuloParens((<ParenthesizedExpression>node).expression, kind);
+                return false;
+            }
+
+            function parentHasKindModuloParens(node: Node, kind: number) : boolean {
+                if (!node.parent)
+                    return false;
+                if (node.parent.kind === kind)
+                    return true;
+                if (node.parent.kind === SyntaxKind.ParenthesizedExpression)
+                    return parentHasKindModuloParens(node.parent, kind);
+                return false;
+            }
+                
             function emitPropertyAccess(node: PropertyAccessExpression) {
                 if (node.checkedType && checkNeededForType(node.checkedType)) {
                     if (node.parent && node.parent.kind === SyntaxKind.BinaryExpression && (<BinaryExpression>node.parent).operatorToken.kind === SyntaxKind.EqualsToken) {
@@ -2241,10 +2308,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitPropertyAccessWithoutCheck(node);
                     write(", ");
                     emitTransientTypeTagFromType(node.checkedType);
-                    if (node.optional)
+                    if (node.optional || 
+                        ((hasKindModuloParens(node.expression, SyntaxKind.TypeAssertionExpression) ||
+                          hasKindModuloParens(node.expression, SyntaxKind.AsExpression)) && inQueryContext(node)))
                         write(", /* optional */ true");
                     write(")");
-                    if (node.parent && node.parent.kind === SyntaxKind.CallExpression) {
+                    if (node.parent && hasKindModuloParens(node.parent, SyntaxKind.CallExpression)) {
                         // FIXME: this is obviously bad since we'll duplicate computation
                         write(".bind(");
                         emit(node.expression);
@@ -2599,16 +2668,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // If the node is synthesized, it means the emitter put the parentheses there,
                 // not the user. If we didn't want them, the emitter would not have put them
                 // there.
+                // [CheckScript note: TypeAssertions and AsExpressions now have semantic content, so we don't want to elide them. /]
                 if (!nodeIsSynthesized(node) && node.parent.kind !== SyntaxKind.ArrowFunction) {
-                    if (node.expression.kind === SyntaxKind.TypeAssertionExpression ||
-                        node.expression.kind === SyntaxKind.AsExpression ||
+                    if (/* [CheckScript] node.expression.kind === SyntaxKind.TypeAssertionExpression ||
+                        node.expression.kind === SyntaxKind.AsExpression || [/CheckScript] */
                         node.expression.kind === SyntaxKind.NonNullExpression) {
                         let operand = (<TypeAssertion | NonNullExpression>node.expression).expression;
 
                         // Make sure we consider all nested cast expressions, e.g.:
                         // (<any><number><any>-A).x;
-                        while (operand.kind === SyntaxKind.TypeAssertionExpression ||
-                            operand.kind === SyntaxKind.AsExpression ||
+                        while (/* [CheckScript] operand.kind === SyntaxKind.TypeAssertionExpression ||
+                            operand.kind === SyntaxKind.AsExpression || [/CheckScript] */
                             operand.kind === SyntaxKind.NonNullExpression) {
                             operand = (<TypeAssertion | NonNullExpression>operand).expression;
                         }
@@ -5170,11 +5240,14 @@ const _super = (function (geti, seti) {
                 // then we need to generate: a => ({})
                 write(" ");
 
-                // Unwrap all type assertions.
+                // Unwrap all type assertions. 
+                // [CheckScript NOTE: or, don't.]
                 let current = body;
+                /* [CheckScript]
                 while (current.kind === SyntaxKind.TypeAssertionExpression) {
                     current = (<TypeAssertion>current).expression;
                 }
+                   [/CheckScript] */
 
                 emitParenthesizedIf(body, current.kind === SyntaxKind.ObjectLiteralExpression);
             }
@@ -8384,8 +8457,12 @@ function TypeArgs(tys) {
                         return emitNewExpression(<NewExpression>node);
                     case SyntaxKind.TaggedTemplateExpression:
                         return emitTaggedTemplateExpression(<TaggedTemplateExpression>node);
+                    //[CheckScript]
                     case SyntaxKind.TypeAssertionExpression:
+                        return emitTypeAssertionExpression(<TypeAssertion>node);
                     case SyntaxKind.AsExpression:
+                        return emitAsExpression(<AsExpression>node);
+                    //[/CheckScript]
                     case SyntaxKind.NonNullExpression:
                         return emit((<AssertionExpression | NonNullExpression>node).expression);
                     case SyntaxKind.ParenthesizedExpression:
