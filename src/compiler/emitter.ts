@@ -2303,6 +2303,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         emitPropertyAccessWithoutCheck(node);
                         return;
                     }
+                    if (node.parent && hasKindModuloParens(node.parent, SyntaxKind.CallExpression)) {
+                        var binding = synthesizeBinder(node.expression, true);
+                        binding.binder.pos = node.expression.pos;
+                        binding.binder.end = node.expression.end;
+                        binding.binder.parent = node;
+                        node.expression = <ParenthesizedExpression>binding.binder;
+                    }
                     emitCheckCall();
                     write("(");
                     emitPropertyAccessWithoutCheck(node);
@@ -2314,9 +2321,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         write(", /* optional */ true");
                     write(")");
                     if (node.parent && hasKindModuloParens(node.parent, SyntaxKind.CallExpression)) {
-                        // FIXME: this is obviously bad since we'll duplicate computation
                         write(".bind(");
-                        emit(node.expression);
+                        emit(binding.id);
                         write(")");
                     }
                 } else {
@@ -2429,16 +2435,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         emitIndexedAccessWithoutCheck(node);
                         return;
                     }
+                    if (node.parent && hasKindModuloParens(node.parent, SyntaxKind.CallExpression)) {
+                        var binding = synthesizeBinder(node.expression, true);
+                        binding.binder.pos = node.expression.pos;
+                        binding.binder.end = node.expression.end;
+                        binding.binder.parent = node;
+                        node.expression = <ParenthesizedExpression>binding.binder;
+                    }
                     emitCheckCall();
                     write("(");
                     emitIndexedAccessWithoutCheck(node);
                     write(", ");
                     emitTransientTypeTag(node.checkedType);
                     write(")");
-                    if (node.parent && node.parent.kind === SyntaxKind.CallExpression) {
-                        // FIXME: this is obviously bad since we'll duplicate computation
+                    if (node.parent && hasKindModuloParens(node.parent, SyntaxKind.CallExpression)) {
                         write(".bind(");
-                        emit(node.expression);
+                        emit(binding.id);
                         write(")");
                     }
                 } else {
@@ -2557,7 +2569,36 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
 
             //[CheckScript]
+            function synthesizeBinder(target: Expression, parens: boolean) {
+                var bind = createTempVariable(TempFlags._i);
+                var binder = createSynthesizedNode(SyntaxKind.BinaryExpression) as BinaryExpression;
+                binder.left = bind;
+                binder.operatorToken = createSynthesizedNode(SyntaxKind.EqualsToken);
+                binder.right = target;
+                if (parens) {
+                    var paren = createSynthesizedNode(SyntaxKind.ParenthesizedExpression) as ParenthesizedExpression;
+                    paren.expression = binder;
+                    return {id: bind, binder: <Expression>paren};
+                }
+                return {id: bind, binder: <Expression>binder};
+            }
+
             function emitCallExpression(node: CallExpression) {
+                if (node.typePredicate && node.typePredicate.kind === TypePredicateKind.Identifier) {
+                    write("(");
+                    var idx = (<IdentifierTypePredicate>node.typePredicate).parameterIndex;
+                    var binding = synthesizeBinder(node.arguments[idx], false);
+                    node.arguments[idx] = binding.binder;
+                    // write("/*");
+                    // emitTransientTypeTag(node.typePredicate.type);
+                    // write(" ");
+                    // if (node.typePredicate.kind === TypePredicateKind.Identifier) {
+                    //     write((<IdentifierTypePredicate>node.typePredicate).parameterName + " " + (<IdentifierTypePredicate>node.typePredicate).parameterIndex);
+                    // } else {
+                    //     write("this");
+                    // }
+                    // write("*/");
+                }
                 if (node.checkedType && checkNeededForType(node.checkedType)) {
                     emitCheckCall();
                     write("(");
@@ -2567,6 +2608,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     write(")");
                 } else {
                     emitCallExpressionWithoutCheck(node);
+                }
+                if (node.typePredicate && node.typePredicate.kind === TypePredicateKind.Identifier) {
+                    write(" && ");
+                    emitCheckCall();
+                    write("(");
+                    emit(binding.id)
+                    write(", ");
+                    emitTransientTypeTag(node.typePredicate.type);
+                    write("))");
                 }
             }
             //[/CheckScript]
@@ -2604,7 +2654,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitCommaList(node.arguments);
                     //[CheckScript]
                     if (node.typeArgumentTypes && node.typeArgumentTypes.length > 0) {
-                        write(", ");
+                        if (node.arguments.length > 0)
+                            write(", ");
                         emitTransientTypeArguments(node.typeArgumentTypes);
                     }
                     //[/CheckScript]

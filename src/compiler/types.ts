@@ -449,7 +449,10 @@ namespace ts {
         /* @internal */ locals?: SymbolTable;           // Locals associated with node (initialized by binding)
         /* @internal */ nextContainer?: Node;           // Next container in declaration order (initialized by binding)
         /* @internal */ localSymbol?: Symbol;           // Local symbol declared by node (initialized by binding only for exported nodes)
-        checkedType?: Type;                             // [CheckScript /]
+        //[CheckScript]
+        checkedType?: Type;                             
+        typePredicate?: TypePredicate;
+        //[/CheckScript]
     }
 
     export interface NodeArray<T> extends Array<T>, TextRange {

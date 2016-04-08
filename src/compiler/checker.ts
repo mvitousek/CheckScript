@@ -11031,6 +11031,9 @@ namespace ts {
             }
 
             //[CheckScript]
+            if (signature.typePredicate) {
+                node.typePredicate = signature.typePredicate;
+            }
             const retty = getReturnTypeOfSignature(signature);
             node.checkedType = normalizeFunctionType(retty);
             return retty
