@@ -2234,6 +2234,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 if (parentHasKindModuloParens(node, SyntaxKind.PropertyAccessExpression) && inQueryContext(findNonParenthesizedParent(node))) {
                     return emit(node.expression);
                 }
+                if (!checkNeededForTypeNode(node.type)) {
+                    return emit(node.expression);
+                }
                 emitCheckCall();
                 write("(");
                 emit(node.expression);
@@ -2246,6 +2249,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             function emitAsExpression(node: AsExpression) {
                 if (parentHasKindModuloParens(node, SyntaxKind.VariableDeclaration) &&
                     !hasKindModuloParens(node.expression, SyntaxKind.Identifier)) {
+                    return emit(node.expression);
+                }
+                if (!checkNeededForTypeNode(node.type)) {
                     return emit(node.expression);
                 }
                 emitCheckCall();
@@ -2296,8 +2302,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     return parentHasKindModuloParens(node.parent, kind);
                 return false;
             }
+
+            function parentModuloParens(node: Node) : Node {
+                if (!node.parent)
+                    throw new Error();
+                if (node.parent.kind === SyntaxKind.ParenthesizedExpression)
+                    return parentModuloParens(node.parent);
+                return node.parent;
+            }
                 
             function emitPropertyAccess(node: PropertyAccessExpression) {
+                // if (parentHasKindModuloParens(node, SyntaxKind.CallExpression)) {
+                //     var callparent = parentModuloParens(node);
+                //     if (callparent.typePredicate && callparent.typePredicate.kind === TypePredicateKind.Self) {
+                //         write("(");
+                //         var binding = synthesizeBinder(node, true);
+                //         emit(
+                //     }
+                // }
                 if (node.checkedType && checkNeededForType(node.checkedType)) {
                     if (node.parent && node.parent.kind === SyntaxKind.BinaryExpression && (<BinaryExpression>node.parent).operatorToken.kind === SyntaxKind.EqualsToken) {
                         emitPropertyAccessWithoutCheck(node);
@@ -2447,6 +2469,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitIndexedAccessWithoutCheck(node);
                     write(", ");
                     emitTransientTypeTag(node.checkedType);
+                    if (node.optional)
+                        write(", /* optional */ true");
                     write(")");
                     if (node.parent && hasKindModuloParens(node.parent, SyntaxKind.CallExpression)) {
                         write(".bind(");
@@ -2584,10 +2608,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
 
             function emitCallExpression(node: CallExpression) {
+                var binding:any;
                 if (node.typePredicate && node.typePredicate.kind === TypePredicateKind.Identifier) {
                     write("(");
                     var idx = (<IdentifierTypePredicate>node.typePredicate).parameterIndex;
-                    var binding = synthesizeBinder(node.arguments[idx], false);
+                    binding = synthesizeBinder(node.arguments[idx], false);
                     node.arguments[idx] = binding.binder;
                     // write("/*");
                     // emitTransientTypeTag(node.typePredicate.type);
@@ -2599,6 +2624,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     // }
                     // write("*/");
                 }
+                if (node.typePredicate && node.typePredicate.kind === TypePredicateKind.This &&
+                    node.expression.kind === SyntaxKind.PropertyAccessExpression) {
+                    write("(");
+                    binding = synthesizeBinder((<PropertyAccessExpression>node.expression).expression, true);
+                    binding.binder.pos = node.expression.pos;
+                    binding.binder.end = node.expression.end;
+                    binding.binder.parent = node;
+                    (<PropertyAccessExpression>node.expression).expression = binding.binder;
+                }
                 if (node.checkedType && checkNeededForType(node.checkedType)) {
                     emitCheckCall();
                     write("(");
@@ -2609,7 +2643,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 } else {
                     emitCallExpressionWithoutCheck(node);
                 }
-                if (node.typePredicate && node.typePredicate.kind === TypePredicateKind.Identifier) {
+                if (binding) {
                     write(" && ");
                     emitCheckCall();
                     write("(");
@@ -5096,7 +5130,7 @@ const _super = (function (geti, seti) {
 
             function emitTransientTypeArguments(types: Type[]) {
                 write("new TypeArgs(");
-                var first = true
+                var first = true;
                 for (var tyarg of types) {
                     if(!first)
                         write(", ");
@@ -5170,10 +5204,9 @@ const _super = (function (geti, seti) {
                     
 
             function emitTransientTypeTagFromType(type: Type) {
-                if (type == undefined) 
+                if (type === undefined) 
                     return;
-                if (type.flags & TypeFlags.String ||
-                    type.flags & TypeFlags.StringLiteral) {
+                if (type.flags & TypeFlags.String) {
                     write("'string'");
                 } else if (type.flags & TypeFlags.Number) {
                     write("'number'");
@@ -5202,15 +5235,60 @@ const _super = (function (geti, seti) {
                     }
                     return write(")");
                 } else if (type.flags & TypeFlags.Anonymous && (<ResolvedType>type).properties) { 
-                    write("['");
-                    var first = true;
-                    for (var n of (<ResolvedType>type).properties) {
-                        if (!first)
-                            write("', '");
-                        first = false;
-                        write(n.name);
+                    var resolved = <ResolvedType>type;
+
+                    function filterProperties() {
+                        return resolved.properties.filter(function (x) { return x.name && (x.name.length > 0) })
                     }
-                    write("']");
+
+                    function writeProperties(str: string) {                        
+                        str += "['";
+                        let first = true;
+                        for (var n of filterProperties()) {
+                            if (!first)
+                                str += "', '";
+                            first = false;
+                            str += n.name;
+                        }
+                        str += "']";
+                        return str;
+                    }
+
+                    let items_needed_for_intersection = 2;
+                    let str = "";
+
+                    if (filterProperties().length > 0) {
+                        str += writeProperties(str);
+                        items_needed_for_intersection -= 1;
+                    }
+
+                    if (resolved.callSignatures.length > 0) {
+                        if (items_needed_for_intersection < 2)
+                            str += ", ";
+                        str += "Function";
+                        items_needed_for_intersection -= 1;
+                    }
+
+                    if (resolved.numberIndexInfo) {
+                        if (items_needed_for_intersection < 2)
+                            str += ", ";
+                        str += "Array";
+                        items_needed_for_intersection -= 1;
+                    }
+
+                    if (items_needed_for_intersection === 2 && resolved.stringIndexInfo) {
+                        str += "Object";
+                        items_needed_for_intersection -= 1;
+                    }
+                    
+                    if (items_needed_for_intersection <= 0) {
+                        write("new Intersection(" + str + ")");
+                    } else if (items_needed_for_intersection === 1) {
+                        write(str);
+                    } else 
+                        write("Object");
+                } else if (type.flags & TypeFlags.StringLiteral) {
+                    write("'" + (<StringLiteralType>type).text + "'");
                 } else if (type.symbol) {
                     write(type.symbol.name);
                 } else {
@@ -5220,22 +5298,24 @@ const _super = (function (geti, seti) {
                 }
             }
 
-            function emitTransientTypeTagFromTypeNode(type: TypeNode):any {
-                function emitEntityName(entityName: EntityName) {
-                    if (entityName.kind === SyntaxKind.Identifier) {
-                        writeTextOfNode(currentText, entityName);
-                    } else {
-                        var qualifiedName = <QualifiedName>entityName;
-                        emitEntityName(qualifiedName.left);
-                        write(".");
-                        writeTextOfNode(currentText, qualifiedName.right);
-                    }
+            function emitEntityName(entityName: EntityName) {
+                if (entityName.kind === SyntaxKind.Identifier) {
+                    writeTextOfNode(currentText, entityName);
+                } else {
+                    var qualifiedName = <QualifiedName>entityName;
+                    emitEntityName(qualifiedName.left);
+                    write(".");
+                    writeTextOfNode(currentText, qualifiedName.right);
                 }
-
+            }
+                
+            function emitTransientTypeTagFromTypeNode(type: TypeNode):any {
                 switch (type.kind) {
                 case SyntaxKind.AnyKeyword:
                 case SyntaxKind.VoidKeyword:
                     return write("Object");
+                case SyntaxKind.StringLiteralType:
+                    return write("'" + (<StringLiteralTypeNode>type).text + "'");
                 case SyntaxKind.StringKeyword:
                 case SyntaxKind.StringLiteral:
                     return write("'string'");
@@ -5267,8 +5347,14 @@ const _super = (function (geti, seti) {
                     return write(")");
                 case SyntaxKind.ArrayType:
                     return write("Array");
+                case SyntaxKind.FunctionType:
+                    return write("Function");
                 case SyntaxKind.TypeReference:
+                    if (type.checkedType)
+                        return emitTransientTypeTag(type.checkedType);
                     return emitEntityName((<TypeReferenceNode>type).typeName);
+                case SyntaxKind.TypeLiteral:
+                    return emitStructuralType(<TypeLiteralNode>type);
                 default:
                     // return Debug.fail("Unsupported CheckScript type: " + type.kind);
                 }
@@ -6618,25 +6704,87 @@ const _super = (function (geti, seti) {
             }
 
             //[CheckScript]
+                //We ought not to need this any more, since we now look up all aliases at use sites.
+            // function emitTypeAlias(node: TypeReferenceNode) {
+            //     emitEntityName(node.typeName);
+            //     write("(");
+            //     if (node.typeArguments) {
+            //         var first = true;
+            //         for (var tyarg of node.typeArguments) {
+            //             if(!first)
+            //                 write(", ");
+            //             first = false;
+            //             emitTransientTypeTag(tyarg);
+            //         }
+            //     }
+            //     write(")");
+            // }
+
             function emitPropertySignature(node: Declaration) {
                 emitVariableDeclaration(<VariableDeclaration>node);
             }
+                
+            function emitStructuralType(node: InterfaceDeclaration | TypeLiteralNode) {
+                write("[");
+                var first = true;
+                for (let i = 0; i < node.members.length; i++) {
+                    if (node.members[i].name && !node.members[i].questionToken && node.members[i].kind !== SyntaxKind.CallSignature && node.members[i].kind !== SyntaxKind.IndexSignature) {
+                        if (!first)
+                            write(", '");
+                        else write("'");
+                        first = false;
+                        emitPropertySignature(node.members[i]);
+                        write("'");
+                    }
+                }
+                write("]");
+            }
+                
+                // We ought not to need this, since we instanciate aliases at use sites
+            // function emitTypeAliasDeclaration(node: TypeAliasDeclaration) {
+            //     write("function ");
+            //     writeTextOfNode(currentText, node.name);
+            //     write("(");
+            //     if (node.typeParameters)
+            //         emitCommaList(node.typeParameters);
+            //     write(") { return ");
+            //     emitTransientTypeTag(node.type);
+            //     write("; }");
+            // }
+
             function emitInterfaceDeclaration(node: InterfaceDeclaration) {
                 write("var ");
                 writeTextOfNode(currentText, node.name);
                 write(" = ");
+
+                type indexKind = 'num' | 'str' | 'none' | 'both';
+
+                const isFunctionInterface = hasCallSignature();
+                const index = indexSignature();
                 
-                if (node.heritageClauses) {
+
+                if (node.heritageClauses || isFunctionInterface || index !== 'none') {
                     write("new Intersection(");
-                    emitInterfaceMembers();
-                    for (var clause of node.heritageClauses) {
-                        // I think there should only ever be one HeritageClause, but not sure
-                        write(", ");
-                        emitHeritageClause(clause);
+                    emitStructuralType(node);
+                    if (node.heritageClauses) {
+                        for (var clause of node.heritageClauses) {
+                            // I think there should only ever be one HeritageClause, but not sure
+                            write(", ");
+                            emitHeritageClause(clause);
+                        }
+                    }
+                    if (isFunctionInterface) {
+                        write(", Function");
+                    }
+                    if (index === 'both' || index === 'str') {
+                        write(", Object");
+                    }
+                    if (index === 'both' || index === 'num') {
+                        write(", Array");
                     }
                     write(")");
                 } else {
-                    emitInterfaceMembers();
+                    emitStructuralType(node);
                 }
                 write(";");
                 writeLine();
@@ -6651,19 +6799,34 @@ const _super = (function (geti, seti) {
                     }
                 }
 
-                function emitInterfaceMembers() {
-                    write("['");
-                    var first = true;
-                    for (let i = 0; i < node.members.length; i++) {
-                        if (node.members[i].name && !node.members[i].questionToken) {
-                            if (!first)
-                                write("', '");
-                            first = false;
-                            emitPropertySignature(node.members[i]);
-                        }
-                    }
-                    write("']");
+                function hasCallSignature() {
+                    if (!node.members)
+                        return false;
+                    for (var mem of node.members) {
+                        if (mem.kind === SyntaxKind.CallSignature)
+                            return true;
+                    } 
+                    return false;
                 }
+
+                function indexSignature() : indexKind {
+                    if (!node.members)
+                        return 'none';
+                    let kind: indexKind = 'none';
+                    for (var mem of node.members) {
+                        if (mem.kind === SyntaxKind.IndexSignature) {
+                            let nkind: indexKind;
+                            if ((<IndexSignatureDeclaration>mem).parameters[0].type.kind === SyntaxKind.StringKeyword)
+                                nkind = 'str';
+                            else nkind = 'num';
+                            if (kind === 'none')
+                                kind = nkind;
+                            else return 'both';
+                        }
+                    } 
+                    return kind;
+                }
+
             }
             //[/CheckScript]
 
@@ -8553,6 +8716,8 @@ function TypeArgs(tys) {
                     case SyntaxKind.TaggedTemplateExpression:
                         return emitTaggedTemplateExpression(<TaggedTemplateExpression>node);
                     //[CheckScript]
+                    // case SyntaxKind.TypeAliasDeclaration:
+                    //     return emitTypeAliasDeclaration(<TypeAliasDeclaration>node);
                     case SyntaxKind.TypeAssertionExpression:
                         return emitTypeAssertionExpression(<TypeAssertion>node);
                     case SyntaxKind.AsExpression:

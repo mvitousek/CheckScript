@@ -10,10 +10,12 @@ function check(val, ty, nullable) {
             return true;
         else if (primitive(ty)) 
             return typeof val === ty;
-        else if (ty === Array) {
+        else if (typeof ty === 'string') { // String literal types
+            return val === ty;
+        } else if (ty === Array) {
             return val.constructor === Array;
         } else if (ty.constructor === Array) {
-            if (typeof val !== 'object')
+            if (ty.length > 0 && typeof val !== 'object')
                 return false;
             for (var i = 0; i < ty.length; i++) {
                 if (!(ty[i] in val))

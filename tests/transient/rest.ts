@@ -6,6 +6,7 @@ f(1,2,3,4);
 f(1);
 
 function g<X>(x:X, ...ys:X[]) {
+  ys[0] = x;
   return x;
 }
 

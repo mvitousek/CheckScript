@@ -43,3 +43,21 @@ function take_a_foo(x:Foo) {
 }
 
 take_a_foo({blah:42})
+
+interface A<X> {
+  x: X
+}
+
+interface B<Y> extends A<Y> {
+  y: Y
+}
+
+interface C extends B<number> {
+  z: number
+}
+
+function lm(a:A<string>, b:B<boolean>, c:C) {
+  a.x;
+  b.y;
+  c.z;
+}

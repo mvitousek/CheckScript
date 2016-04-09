@@ -740,6 +740,7 @@ namespace ts {
     export interface TypeReferenceNode extends TypeNode {
         typeName: EntityName;
         typeArguments?: NodeArray<TypeNode>;
+        //symbol?: Symbol //[/CheckScript] no longer needed
     }
 
     // @kind(SyntaxKind.TypePredicate)
@@ -986,6 +987,7 @@ namespace ts {
     export interface ElementAccessExpression extends MemberExpression {
         expression: LeftHandSideExpression;
         argumentExpression?: Expression;
+        optional?: boolean //[CheckScript /]
     }
 
     // @kind(SyntaxKind.CallExpression)
