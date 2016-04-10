@@ -5115,17 +5115,42 @@ const _super = (function (geti, seti) {
 
             function emitArgumentProtectors(node: FunctionLikeDeclaration) {
                 var rest:ParameterDeclaration;
+                var lb = 0;
+                var ub = 0;
+                var len = node.parameters.length;
                 if (hasRestParameter(node))
-                    rest = node.parameters[node.parameters.length - 1];
+                    len -= 1;
 
-                forEach(node.parameters, param => {
-                    if (param !== rest && param.type && checkNeededForTypeNode(param.type)) {
-                        writeLine();
-                        emitStart(param);
-                        emitTransientVarCheck(param.name, param.type)
-                        emitEnd(param);
+                var first = true;
+                for (var i = 0; i < len; i++) {
+                    let param = node.parameters[i];
+                    writeLine();
+                    emitStart(param);
+                    let optional:boolean;
+                    if (!param.questionToken && !param.initializer) {
+                        lb = i;
+                        ub = i;
+                        optional = false;
+                    } else { 
+                        ub = i;
+                        optional = true;
                     }
-                });
+                    if (param.type && checkNeededForTypeNode(param.type))
+                        emitTransientVarCheck(param.name, param.type, optional)
+                    emitEnd(param);
+                }
+                
+                writeLine();
+                if (!hasRestParameter(node)) {
+                    if (lb === ub) {
+                        write("assert(arguments.length === " + (lb + 1) + ");");
+                    } else {
+                        write("assert(arguments.length >= " + (lb + 1) + " && arguments.length <= " + (ub + 1) + ");");
+                    }
+                } else {
+                    write("assert(arguments.length >= " + (lb + 1) + ");");
+                }
+                    
             }
 
             function emitTransientTypeArguments(types: Type[]) {
@@ -5182,12 +5207,15 @@ const _super = (function (geti, seti) {
             }
 
 
-            function emitTransientVarCheck(name: Identifier | BindingPattern, type: TypeNode | Type) {
+            function emitTransientVarCheck(name: Identifier | BindingPattern, type: TypeNode | Type, optional:boolean = false) {
                 emitCheckCall();
                 write("(");
                 emit(name);
                 write(", ");
                 emitTransientTypeTag(type);
+                if (optional) {
+                    write(", /* optional */ true");
+                }
                 write(");");
             }
 
@@ -5504,9 +5532,11 @@ const _super = (function (geti, seti) {
                 else {
                     increaseIndent();
                     // [CheckScript]
-                    if (node.typeParameters && !hasRestParameter(node)) { 
-                        // If it has a rest parameter, we handle this while emitting the rest handler 
-                        emitPolymorphismHandler(node);
+                    if (!hasRestParameter(node)) {
+                        if (node.typeParameters) { 
+                            // If it has a rest parameter, we handle this while emitting the rest handler 
+                            emitPolymorphismHandler(node);
+                        }
                     }
                     emitArgumentProtectors(node);
                     // [/CheckScript]
