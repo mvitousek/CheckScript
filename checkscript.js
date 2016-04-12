@@ -34,6 +34,8 @@ function check(val, ty, nullable) {
                     return false;
             }
             return true;
+        } else if (ty instanceof ArrayLength) {
+            return val.constructor === Array && val.length >= ty.len;
         } else {
             return val instanceof ty;
         }
@@ -62,5 +64,10 @@ function Intersection() {
 
 function TypeArgs() {
     this.types = Array.prototype.slice.call(arguments);
+    return this;
+}
+
+function ArrayLength(n) {
+    this.len = n;
     return this;
 }

@@ -5242,6 +5242,8 @@ const _super = (function (geti, seti) {
                     write("'boolean'");
                 } else if (type.flags & TypeFlags.ContainsAnyFunctionType) {
                     write("Function");
+                } else if (type.flags & TypeFlags.Tuple) {
+                    write("ArrayLength(" + (<TupleType>type).elementTypes.length + ")");
                 } else if (type.flags & TypeFlags.Union && (<UnionOrIntersectionType>type).types) {
                     write("new Union(");
                     var first = true;
@@ -5314,13 +5316,13 @@ const _super = (function (geti, seti) {
                     } else if (items_needed_for_intersection === 1) {
                         write(str);
                     } else 
-                        write("Object");
+                        write("Objecta");
                 } else if (type.flags & TypeFlags.StringLiteral) {
                     write("'" + (<StringLiteralType>type).text + "'");
                 } else if (type.symbol) {
                     write(type.symbol.name);
                 } else {
-                    write("Object");
+                    write("Objectb");
                     //console.log(type);
                     //throw new Error("Cannot create dynamic type check!");
                 }
@@ -5375,6 +5377,8 @@ const _super = (function (geti, seti) {
                     return write(")");
                 case SyntaxKind.ArrayType:
                     return write("Array");
+                case SyntaxKind.TupleType:
+                    return write("ArrayLength(" + (<TupleTypeNode>type).elementTypes.length + ")");
                 case SyntaxKind.FunctionType:
                     return write("Function");
                 case SyntaxKind.TypeReference:
