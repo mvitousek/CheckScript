@@ -4783,7 +4783,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     emitStart(restParam);
                     emitNodeWithCommentsAndWithoutSourcemap(restParam.name);
                     //[CheckScript]
-                    if (checkNeededForTypeNode(restType) &&
+                    if (restType && checkNeededForTypeNode(restType) &&
                         restType.kind === SyntaxKind.ArrayType &&
                         checkNeededForTypeNode((<ArrayTypeNode>restType).elementType)) {
                         write("[" + tempName + " - " + restIndex + "] = check(arguments[" + tempName + "], ");
@@ -5109,14 +5109,17 @@ const _super = (function (geti, seti) {
                     if (param.type && checkNeededForTypeNode(param.type)) {
                         return true;
                     }
+                    if (!param.questionToken && !param.initializer) {
+                        return true;
+                    }
                 }
-                return false;
+                return !hasRestParameter(node);
             }
 
             function emitArgumentProtectors(node: FunctionLikeDeclaration) {
                 var rest:ParameterDeclaration;
-                var lb = 0;
-                var ub = 0;
+                var lb = -1;
+                var ub = -1;
                 var len = node.parameters.length;
                 if (hasRestParameter(node))
                     len -= 1;
@@ -5475,7 +5478,7 @@ const _super = (function (geti, seti) {
 
                 // If we didn't have to emit any preamble code, then attempt to keep the arrow
                 // function on one line.
-                if (!preambleEmitted && nodeStartPositionsAreOnSameLine(node, body)) {
+                if (!preambleEmitted && nodeStartPositionsAreOnSameLine(node, body) && !argumentProtectorsNeeded(node)) { //[CheckScript arg protectors needed /]
                     write(" ");
                     emitStart(body);
                     write("return ");
@@ -5487,6 +5490,15 @@ const _super = (function (geti, seti) {
                 }
                 else {
                     increaseIndent();
+                    // [CheckScript]
+                    if (!hasRestParameter(node)) {
+                        if (node.typeParameters) { 
+                            // If it has a rest parameter, we handle this while emitting the rest handler 
+                            emitPolymorphismHandler(node);
+                        }
+                    }
+                    emitArgumentProtectors(node);
+                    // [/CheckScript]
                     writeLine();
                     emitLeadingComments(node.body);
                     emitStart(body);
