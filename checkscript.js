@@ -36,6 +36,8 @@ function check(val, ty, nullable) {
             return true;
         } else if (ty instanceof ArrayLength) {
             return val.constructor === Array && val.length >= ty.len;
+        } else if (ty['chs_enum']) {
+            return typeof val === 'number' && ty[val] !== undefined;
         } else {
             return val instanceof ty;
         }

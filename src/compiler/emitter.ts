@@ -5370,13 +5370,13 @@ const _super = (function (geti, seti) {
                     } else if (items_needed_for_intersection === 1) {
                         write(str);
                     } else 
-                        write("Objecta");
+                        write("Object");
                 } else if (type.flags & TypeFlags.StringLiteral) {
                     write("'" + (<StringLiteralType>type).text + "'");
                 } else if (type.symbol) {
                     write(type.symbol.name);
                 } else {
-                    write("Objectb");
+                    write("Object");
                     //console.log(type);
                     //throw new Error("Cannot create dynamic type check!");
                 }
@@ -6929,11 +6929,14 @@ const _super = (function (geti, seti) {
 
             function shouldEmitEnumDeclaration(node: EnumDeclaration) {
                 const isConstEnum = isConst(node);
-                return !isConstEnum || compilerOptions.preserveConstEnums || compilerOptions.isolatedModules;
+                //[CheckScript]
+                // return !isConstEnum || compilerOptions.preserveConstEnums || compilerOptions.isolatedModules;
+                return true;
+                //[/CheckScript]
             }
 
             function emitEnumDeclaration(node: EnumDeclaration) {
-                // const enums are completely erased during compilation.
+                // const enums are NOT erased in Checkscript
                 if (!shouldEmitEnumDeclaration(node)) {
                     return;
                 }
@@ -6961,6 +6964,12 @@ const _super = (function (geti, seti) {
                 emitEnd(node.name);
                 write(") {");
                 increaseIndent();
+                //[CheckScript]
+                writeLine();
+                emit(node.name);
+                write("['chs_enum'] = true;");
+                writeLine();
+                //[/CheckScript]
                 emitLines(node.members);
                 decreaseIndent();
                 writeLine();
