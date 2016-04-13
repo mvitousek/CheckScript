@@ -2303,14 +2303,61 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 return false;
             }
 
-            function parentModuloParens(node: Node) : Node {
+            function parentModuloParens(node: Node) : [Node, Node] {
                 if (!node.parent)
                     throw new Error();
                 if (node.parent.kind === SyntaxKind.ParenthesizedExpression)
                     return parentModuloParens(node.parent);
-                return node.parent;
+                return [node, node.parent];
             }
                 
+            function inAssignmentContext(node: Node): boolean {
+                function assignmentToken(tok: SyntaxKind): boolean {
+                    switch (tok) {
+                    case SyntaxKind.EqualsToken:
+                    case SyntaxKind.PlusEqualsToken:
+                    case SyntaxKind.MinusEqualsToken:
+                    case SyntaxKind.AsteriskEqualsToken:
+                    case SyntaxKind.AsteriskAsteriskEqualsToken:
+                    case SyntaxKind.SlashEqualsToken: 
+                    case SyntaxKind.PercentEqualsToken:
+                    case SyntaxKind.LessThanLessThanEqualsToken:
+                    case SyntaxKind.GreaterThanGreaterThanEqualsToken:
+                    case SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken:
+                    case SyntaxKind.AmpersandEqualsToken:
+                    case SyntaxKind.BarEqualsToken:
+                    case SyntaxKind.CaretEqualsToken:
+                    case SyntaxKind.PlusPlusToken:
+                    case SyntaxKind.MinusMinusToken:
+                        return true;
+                    default: return false;
+                    
+                    }
+                }
+
+                if (!node.parent) {
+                    return false;
+                }
+
+
+                if (node.parent.kind === SyntaxKind.BinaryExpression && assignmentToken((<BinaryExpression>node.parent).operatorToken.kind) &&
+                    (<BinaryExpression>node.parent).left === node) {
+                    return true;
+                }
+
+                if ((node.parent.kind === SyntaxKind.PrefixUnaryExpression || node.parent.kind === SyntaxKind.PostfixUnaryExpression) &&
+                    assignmentToken((<PrefixUnaryExpression | PostfixUnaryExpression>node.parent).operator) &&
+                    (<PrefixUnaryExpression | PostfixUnaryExpression>node.parent).operand === node) {
+                    return true;
+                }
+                    
+                if (node.parent.kind === SyntaxKind.ParenthesizedExpression) {
+                    return inAssignmentContext(node.parent);
+                }
+
+                return false;
+            }
+
             function emitPropertyAccess(node: PropertyAccessExpression) {
                 // if (parentHasKindModuloParens(node, SyntaxKind.CallExpression)) {
                 //     var callparent = parentModuloParens(node);
@@ -2321,16 +2368,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 //     }
                 // }
                 if (node.checkedType && checkNeededForType(node.checkedType)) {
-                    if (node.parent && node.parent.kind === SyntaxKind.BinaryExpression && (<BinaryExpression>node.parent).operatorToken.kind === SyntaxKind.EqualsToken) {
+                    if (inAssignmentContext(node)) {
                         emitPropertyAccessWithoutCheck(node);
                         return;
                     }
-                    if (node.parent && hasKindModuloParens(node.parent, SyntaxKind.CallExpression)) {
-                        var binding = synthesizeBinder(node.expression, true);
-                        binding.binder.pos = node.expression.pos;
-                        binding.binder.end = node.expression.end;
-                        binding.binder.parent = node;
-                        node.expression = <ParenthesizedExpression>binding.binder;
+
+                    if (parentHasKindModuloParens(node, SyntaxKind.CallExpression)) {
+                        var [child, par] = parentModuloParens(node);
+                        if ((<CallExpression>par).expression === child) {
+                            var binding = synthesizeBinder(node.expression, true);
+                            binding.binder.pos = node.expression.pos;
+                            binding.binder.end = node.expression.end;
+                            binding.binder.parent = node;
+                            node.expression = <ParenthesizedExpression>binding.binder;
+                        }
                     }
                     emitCheckCall();
                     write("(");
@@ -2342,7 +2393,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                           hasKindModuloParens(node.expression, SyntaxKind.AsExpression)) && inQueryContext(node)))
                         write(", /* optional */ true");
                     write(")");
-                    if (node.parent && hasKindModuloParens(node.parent, SyntaxKind.CallExpression)) {
+                    if (binding) {
                         write(".bind(");
                         emit(binding.id);
                         write(")");
@@ -2453,7 +2504,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             //[CheckScript]
             function emitIndexedAccess(node: ElementAccessExpression) {
                 if (node.checkedType && checkNeededForType(node.checkedType)) {
-                    if (node.parent && node.parent.kind === SyntaxKind.BinaryExpression && (<BinaryExpression>node.parent).operatorToken.kind === SyntaxKind.EqualsToken) {
+                    if (inAssignmentContext(node)) {
                         emitIndexedAccessWithoutCheck(node);
                         return;
                     }
